@@ -1,0 +1,61 @@
+# ──────────────────────────────────────────────
+#  Keyword Rank Tracker — Root .gitignore
+# ──────────────────────────────────────────────
+
+# ── Python ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# ── Environment / Secrets ────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# ── Exported files (generated at runtime) ───
+backend/exports/files/
+
+# ── Node.js ─────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+frontend/dist/
+frontend/.vite/
+
+# ── OS / Editor ──────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/settings.json
+
+# ── Logs ────────────────────────────────────
+*.log
+logs/
