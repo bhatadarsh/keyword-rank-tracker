@@ -7,7 +7,16 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ## 2026-09-02
 
-### Session 1 — Initial Project Build
+### Session 3 — Bug Fixes & Dev Launcher
+
+**[FIX]** `frontend/src/index.css` — Moved Google Fonts `@import` above `@import "tailwindcss"`. PostCSS requires all `@import` statements to be consecutive and come before any other rules.
+
+**[FIX]** `backend/rank_tracker.db` — Deleted stale SQLite database that was missing the new `page_title` column. SQLAlchemy `create_all` does not add columns to existing tables; DB is auto-recreated on next startup with the correct schema.
+
+**[FEAT]** `start.ps1` [NEW] — Single PowerShell launcher that starts both the FastAPI backend and React frontend in separate terminal windows, with pre-flight checks, coloured output, and auto-opens the browser at `http://localhost:5173`.
+
+**[CHORE]** Switched `SERP_PROVIDER` from `mock` to `serpapi` in `backend/.env` — real Google organic ranking data now active.
+
 
 **[FEAT]** Scaffolded full-stack project structure:
 - `backend/` — FastAPI Python server

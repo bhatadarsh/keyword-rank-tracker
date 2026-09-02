@@ -1,8 +1,8 @@
-/* Tailwind v4 — single import replaces the @tailwind base/components/utilities directives */
-@import "tailwindcss";
-
-/* ── Google Font ───────────────────────────────────────────────────── */
+/* ── Google Font — must come before @import "tailwindcss" ─────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Tailwind v4 */
+@import "tailwindcss";
 
 /* ── Global base styles ────────────────────────────────────────────── */
 @layer base {
