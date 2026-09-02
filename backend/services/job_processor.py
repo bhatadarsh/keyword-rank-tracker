@@ -8,10 +8,12 @@ from database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
-# Max concurrent keywords in flight per job (respects rate limits)
-CONCURRENCY_LIMIT = 1
-# Delay between API calls (seconds) to avoid rate limiting
-REQUEST_DELAY = 1.2
+# Delay between API calls (seconds) — prevents rate limiting
+REQUEST_DELAY = 2.0
+
+# Retry settings for rate-limited requests
+MAX_RETRIES = 3
+RETRY_BACKOFF = [5, 10, 20]  # seconds to wait before each retry
 
 
 async def process_job(job_id: str):
@@ -62,14 +64,28 @@ async def process_job(job_id: str):
                 idx, total, task.keyword, task.country, task.language, task.device,
             )
 
-            response = provider.search(
-                keyword=task.keyword,
-                country=task.country,
-                language=task.language,
-                device=task.device,
-                depth=job.depth,
-            )
+            # ── Retry loop with exponential backoff ──────────────────────
+            response = None
+            for attempt in range(MAX_RETRIES + 1):
+                response = provider.search(
+                    keyword=task.keyword,
+                    country=task.country,
+                    language=task.language,
+                    device=task.device,
+                    depth=job.depth,
+                )
 
+                if response.status not in ("rate_limited", "timeout"):
+                    break  # Success or a permanent error — don't retry
+
+                wait = RETRY_BACKOFF[min(attempt, len(RETRY_BACKOFF) - 1)]
+                logger.warning(
+                    "  [%s] for %r — retry %d/%d in %ds",
+                    response.status, task.keyword, attempt + 1, MAX_RETRIES, wait,
+                )
+                await asyncio.sleep(wait)
+
+            # ── Process final response ────────────────────────────────────
             if response.status == "success":
                 rank, url, title = calculate_best_rank(job.domain, response.results)
 
@@ -85,11 +101,11 @@ async def process_job(job_id: str):
 
             elif response.status == "rate_limited":
                 task.status = KeywordStatus.rate_limited.value
-                logger.warning("  → Rate limited for %r — marking task accordingly", task.keyword)
+                logger.warning("  → Permanently rate limited for %r after %d retries", task.keyword, MAX_RETRIES)
 
             elif response.status == "timeout":
                 task.status = KeywordStatus.timeout.value
-                logger.warning("  → Timeout for %r", task.keyword)
+                logger.warning("  → Timeout for %r after %d retries", task.keyword, MAX_RETRIES)
 
             else:
                 task.status = KeywordStatus.api_error.value
@@ -97,7 +113,7 @@ async def process_job(job_id: str):
 
             db.commit()
 
-            # Throttle between requests to respect rate limits
+            # Throttle between requests
             if idx < total:
                 await asyncio.sleep(REQUEST_DELAY)
 
