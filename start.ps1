@@ -22,6 +22,19 @@ Write-Host "  ==========================================" -ForegroundColor Blue
 Write-Host ""
 
 # ── Pre-flight checks ───────────────────────────────────────
+Info "Checking for existing processes on ports 8000 and 5173..."
+$ports = @(8000, 5173)
+foreach ($port in $ports) {
+    $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+    if ($conns) {
+        foreach ($conn in $conns) {
+            $pidToKill = $conn.OwningProcess
+            Warn "Killing orphaned process $pidToKill holding port $port..."
+            Stop-Process -Id $pidToKill -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 if (-not (Test-Path $Venv)) {
     Err "Python venv not found at $Venv"
     Err "Please run: cd backend; python -m venv venv; .\venv\Scripts\activate; pip install -r requirements.txt"
