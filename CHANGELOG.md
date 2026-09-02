@@ -7,7 +7,26 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ## 2026-09-02
 
+### Session 4 — Live SerpApi Testing & Stability Improvements
+> Git commits: `fe088c9`, `1c5a080`
+
+**[FIX]** `backend/services/job_processor.py` — Added **retry with exponential backoff** for `rate_limited` and `timeout` responses:
+  - Up to **3 automatic retries** per keyword before marking as permanently failed
+  - Backoff schedule: 5s → 10s → 20s between retries
+  - Increased base `REQUEST_DELAY` from 1.2s to 2.0s between keywords to be safer with SerpApi throttling
+
+**[CHORE]** Switched `SERP_PROVIDER=serpapi` in `backend/.env` — first live test with real Google organic data conducted successfully.
+
+**[TEST]** `test_github.csv` [NEW] — 10 keywords for `github.com` across India, US, UK to verify live ranking detection (expected: rank 1–5 for "github", "code repository").
+
+**[TEST]** `test_wikipedia.csv` [NEW] — 10 informational keywords for `wikipedia.org` as a gold-standard verification test (expected: rank 1 for "free encyclopedia", "wikipedia").
+
+**[DOCS]** `CHANGELOG.md` — Backfilled Session 3 entries; established daily log format with git commit hash references.
+
+---
+
 ### Session 3 — Bug Fixes & Dev Launcher
+> Git commit: `92230b8`
 
 **[FIX]** `frontend/src/index.css` — Moved Google Fonts `@import` above `@import "tailwindcss"`. PostCSS requires all `@import` statements to be consecutive and come before any other rules.
 
