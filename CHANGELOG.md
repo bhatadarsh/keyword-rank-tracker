@@ -7,6 +7,18 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ## 2026-09-02
 
+### Session 5 — Premium Dark Mode UI Overhaul
+
+**[FEAT]** Completely redesigned the frontend aesthetic to a Premium Dark Mode (Vercel/Linear style), replacing the basic Tailwind template look:
+- **Typography**: Switched to the modern, geometric `Outfit` font for a sleek tech feel.
+- **Color System**: Implemented a deep dark background (`Zinc 950`) with subtle radial mesh gradients.
+- **Glassmorphism**: Added `backdrop-blur` and translucent backgrounds to panels, headers, and tables.
+- **Animations**: Added glowing pulse effects to empty states, shimmer effects to progress bars, hover scale transforms, and seamless color transitions on all interactive elements.
+- **Rank Badges**: Built custom glowing gradient badges based on rank tiers (Top 3: Gold, Top 10: Emerald, Top 30: Indigo).
+- **Custom Scrollbar**: Replaced default webkit scrollbar with a minimal dark mode variant.
+
+---
+
 ### Session 4 — Live SerpApi Testing & Stability Improvements
 > Git commits: `fe088c9`, `1c5a080`
 
