@@ -1,4 +1,4 @@
-import asyncio
+import time
 import logging
 from sqlalchemy.orm import Session
 from models import Job, KeywordTask, JobStatus, KeywordStatus
@@ -16,16 +16,10 @@ MAX_RETRIES = 3
 RETRY_BACKOFF = [5, 10, 20]  # seconds to wait before each retry
 
 
-async def process_job(job_id: str):
+def process_job(job_id: str):
     """
     Background task to process a rank check job.
-
-    Flow:
-      1. Fetch the job and all pending keyword tasks from DB.
-      2. For each task, call the configured SERP provider.
-      3. Run calculate_best_rank() on the results.
-      4. Persist rank, url, title, and status back to DB.
-      5. Mark the job as completed (or failed on exception).
+    Runs in a FastAPI threadpool because it is a synchronous `def`.
     """
     db: Session = SessionLocal()
     job = None
@@ -83,7 +77,7 @@ async def process_job(job_id: str):
                     "  [%s] for %r — retry %d/%d in %ds",
                     response.status, task.keyword, attempt + 1, MAX_RETRIES, wait,
                 )
-                await asyncio.sleep(wait)
+                time.sleep(wait)
 
             # ── Process final response ────────────────────────────────────
             if response.status == "success":
@@ -115,7 +109,7 @@ async def process_job(job_id: str):
 
             # Throttle between requests
             if idx < total:
-                await asyncio.sleep(REQUEST_DELAY)
+                time.sleep(REQUEST_DELAY)
 
         job.status = JobStatus.completed.value
         db.commit()
@@ -124,7 +118,11 @@ async def process_job(job_id: str):
     except Exception as exc:
         logger.exception("Unhandled exception in job %s: %s", job_id, exc)
         if job:
-            job.status = JobStatus.failed.value
-            db.commit()
+            db.rollback()  # VERY IMPORTANT: Clear any broken transaction state before updating status
+            try:
+                job.status = JobStatus.failed.value
+                db.commit()
+            except Exception as inner_exc:
+                logger.error("Failed to update job status to failed: %s", inner_exc)
     finally:
         db.close()
