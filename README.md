@@ -51,6 +51,34 @@ I built this project after looking at how SEO teams manually check keyword ranki
 
 ---
 
+## Key Features
+
+These are the features I built to solve real SEO associate pain points — not just cosmetic additions.
+
+### 🏆 Rank Tier Distribution Cards
+After each scan, the results are broken down into five visual cards: **Top 3**, **Top 10**, **Page 2–3**, **Beyond 30**, and **Not Found**. Each card shows the count, percentage, and a color-coded bar. An SEO associate can see the full ranking distribution at a glance without scrolling through 200 rows.
+
+### 🎯 Opportunities Filter
+A dedicated tab highlights keywords ranking **11–30** — the ones just off page 1. These are the highest-ROI keywords for an SEO team to prioritize because they are already close to page 1 and often need less effort to improve. The tab shows a live pulse indicator when there are non-zero opportunities.
+
+### 🔍 Expandable Row Detail
+Clicking any keyword row expands it inline to show the full URL, full page title, a **"Verify on Google"** button (opens a pre-filled search), and a **"Copy URL"** button. This eliminates the manual step of re-googling every result to verify.
+
+### 📋 Copy to Clipboard (Google Sheets ready)
+A "Copy" button copies the currently **filtered and sorted** results as TSV directly to the clipboard. Paste it immediately into Google Sheets or Excel — columns come out correctly without any reformatting.
+
+### 📊 Summary Statistics Strip
+After a scan completes, a summary bar shows: **Best Rank** (with the keyword name), **Average Rank** across all found results, and **Page 1 keyword count**. Useful for weekly reporting.
+
+### 🎨 Row Color Coding
+Rows are visually tiered without any filtering required. Top 3 rows have an amber left border, Top 10 rows have emerald, Page 2–3 rows have blue. An associate can scan the table visually and identify the good/bad/near-miss keywords instantly.
+
+### 📁 Job History
+All past scans are stored and accessible from the **History tab**. Each row shows the company, domain, settings, found %, date, and status. Clicking "View" reloads the full results for any past job.
+
+---
+
+
 ## How I Would Explain This Project in an Interview
 
 I built an automated keyword rank tracker. The user uploads a list of keywords and provides a target domain, country, language, and device. The React frontend sends this to a FastAPI backend, which creates a job and processes each keyword through a SERP provider. I separated the provider behind an interface so I could use a mock provider for development and swap providers later.

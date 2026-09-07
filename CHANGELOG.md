@@ -5,7 +5,53 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ---
 
-## 2026-09-02
+## 2026-09-07
+
+### Session 7 — Unique Production Features for SEO Associates
+
+**[FEAT]** Added **Rank Tier Breakdown Cards** — a 5-card visual dashboard showing the full distribution of keyword rankings:
+- **Top 3** (Gold): Keywords in the coveted positions 1–3.
+- **Top 10** (Emerald): Remaining page 1 keywords (positions 4–10).
+- **Page 2–3** (Blue): Positions 11–30, labelled "Near miss".
+- **Beyond 30** (Gray): Low-visibility rankings.
+- **Not Found** (Rose): Keywords with zero presence.
+- Each card shows count, %, and a color-matched mini progress bar at the bottom.
+
+**[FEAT]** Added **"🎯 Opportunities" Filter Tab** — highlights keywords ranking 11–30 (just off page 1). This is pure gold for SEO teams: these are the highest-ROI keywords to focus on.
+- The tab shows a **live pulse dot** whenever there are non-zero opportunities, drawing attention without being intrusive.
+- A contextual tip banner appears: *"These rank 11–30. Focus SEO here for quick wins."*
+
+**[FEAT]** Added **Expandable Row Detail Panel** — click any keyword row to expand it inline and see:
+- The full, untruncated URL and page title.
+- A **"Verify on Google"** button that opens a pre-filled Google search for that keyword (for instant manual verification).
+- A **"Copy URL"** button with a ✓ confirmation animation.
+- This eliminates the need to manually re-search every result.
+
+**[FEAT]** Added **"Copy to Clipboard" button** in the results header:
+- Copies the **currently filtered and sorted** results as TSV (tab-separated) to clipboard.
+- Pastes directly and correctly into **Google Sheets or Excel** with column headers (Keyword, Rank, Status, Page Title, URL).
+- Toast confirms: *"X rows copied — paste directly into Google Sheets!"*
+
+**[FEAT]** Added **Summary Statistics Strip** (shown after scan completes):
+- **Best Rank**: The single best keyword position with the keyword name shown as a subtitle.
+- **Average Rank**: Mean rank across all found keywords.
+- **Page 1 Keywords**: Total count of keywords in positions 1–10.
+
+**[FEAT]** Added **Row-level color-coding by rank tier**:
+- Top 3 rows → subtle amber left-border + amber hover.
+- Top 10 rows → emerald left-border + emerald hover.
+- Page 2–3 rows → blue left-border + blue hover.
+- Instant visual grouping without needing to filter.
+
+**[FEAT]** Enhanced **completion toast notification** to include opportunity count:
+- *"Scan complete! 23/100 ranking • 14 opportunities near page 1"*
+
+**[FEAT]** Enhanced **sidebar live stats** to show Top 3 / Top 10 / Opportunities / Not Found separately (instead of just Found/Not Found/Errors).
+
+**[FIX]** Added `GET /api/rank-check` (list endpoint) to backend — required by the History tab to load all past jobs with `found_count` and `keyword_count` pre-calculated.
+
+---
+
 
 ### Session 5 — Premium Dark Mode UI Overhaul
 
