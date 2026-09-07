@@ -25,6 +25,30 @@ ALLOWED_DEPTHS = {100, 200, 500}
 ALLOWED_DEVICES = {"desktop", "mobile"}
 
 
+@router.get("", summary="List all jobs (history)")
+def list_jobs(db: Session = Depends(get_db)):
+    """Return the 50 most recent jobs, newest first. Used by the History tab."""
+    jobs = db.query(Job).order_by(Job.created_at.desc()).limit(50).all()
+    result = []
+    for job in jobs:
+        tasks = db.query(KeywordTask).filter(KeywordTask.job_id == job.id).all()
+        found = sum(1 for t in tasks if t.status == KeywordStatus.found.value)
+        result.append({
+            "job_id": job.id,
+            "company_name": job.company_name,
+            "domain": job.domain,
+            "status": job.status,
+            "country": job.country,
+            "language": job.language,
+            "device": job.device,
+            "keyword_count": len(tasks),
+            "found_count": found,
+            "created_at": job.created_at.isoformat() if job.created_at else None,
+        })
+    return result
+
+
+
 def _clean_domain(raw: str) -> str:
     """Normalise a user-provided domain string."""
     return normalize_domain(raw.strip())
