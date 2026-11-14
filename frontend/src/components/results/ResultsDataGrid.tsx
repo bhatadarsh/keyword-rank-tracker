@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Search, Download, ClipboardCopy, Check, AlertTriangle,
   ExternalLink, ChevronRight, X, ArrowUpRight, ArrowDownRight,
-  Sparkles, Globe, Monitor, Smartphone, Layers
+  Minus, Globe, Monitor, Smartphone, Layers, Trophy, Target, TrendingUp
 } from 'lucide-react';
 import type { Result, StatusFilter, SortCol, SortDir } from '../../types';
 
@@ -11,6 +11,8 @@ interface ResultsDataGridProps {
   domain: string;
   onDownload: (format: 'csv' | 'xlsx') => void;
   onAddToast: (type: 'success' | 'error' | 'info' | 'warning', msg: string) => void;
+  onFilterOpportunities?: () => void;
+  onExpandRow?: () => void;
 }
 
 export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
@@ -18,6 +20,8 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
   domain,
   onDownload,
   onAddToast,
+  onFilterOpportunities,
+  onExpandRow,
 }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
@@ -66,6 +70,20 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
     }
   };
 
+  const handleSelectFilter = (f: StatusFilter) => {
+    setFilter(f);
+    if (f === 'opportunities' && onFilterOpportunities) {
+      onFilterOpportunities();
+    }
+  };
+
+  const handleOpenRow = (res: Result) => {
+    setSelectedResult(res);
+    if (onExpandRow) {
+      onExpandRow();
+    }
+  };
+
   // Copy filtered table to clipboard (TSV formatted for Google Sheets)
   const handleCopyTSV = () => {
     const header = 'Keyword\tRank\tPrevious Rank\tDelta\tRanking URL\tCannibalization\tPage Title\tStatus';
@@ -103,7 +121,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
       `Current Ranking URL: ${res.ranking_url || 'None'}\n` +
       `Page Title: ${res.page_title || 'None'}\n` +
       (res.cannibalization
-        ? `⚠️ Cannibalization Detected: Secondary URL ranks at #${res.secondary_rank} (${res.secondary_ranking_url})\n`
+        ? `Cannibalization Alert: Secondary URL ranks at #${res.secondary_rank} (${res.secondary_ranking_url})\n`
         : '') +
       `\nTop 5 Competing SERP Results:\n${compText}\n\n` +
       `Provide an institutional-grade optimization plan with:\n` +
@@ -118,92 +136,95 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
   };
 
   const oppCount = results.filter((r) => r.rank && r.rank >= 11 && r.rank <= 30).length;
+  const page1Count = results.filter((r) => r.rank && r.rank >= 1 && r.rank <= 10).length;
   const cannibalizedCount = results.filter((r) => r.cannibalization).length;
   const deltaCount = results.filter((r) => r.rank_delta !== null && r.rank_delta !== 0).length;
 
   return (
-    <div className="space-y-4">
-      {/* Search & Smart Filter Toolbar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-zinc-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-3">
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+    <div className="space-y-4 animate-fade-in">
+      {/* Search & Filter Toolbar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shadow-xs">
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
           <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            type="button"
+            onClick={() => handleSelectFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
               filter === 'all'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/60'
+                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
             }`}
           >
-            All Keywords <span className="font-mono text-[10px] ml-1 opacity-70">({results.length})</span>
+            All Keywords <span className="font-mono text-[11px] ml-1 opacity-70">({results.length})</span>
           </button>
 
           <button
-            onClick={() => setFilter('opportunities')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              filter === 'opportunities'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-blue-400 hover:bg-blue-500/10'
-            }`}
-          >
-            <span>🔥 Opportunities (11-30)</span>
-            <span className="font-mono text-[10px] bg-blue-500/20 px-1.5 py-0.2 rounded-full">
-              {oppCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setFilter('page1')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            type="button"
+            onClick={() => handleSelectFilter('page1')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               filter === 'page1'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-emerald-400 hover:bg-emerald-500/10'
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-900/60'
+                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
             }`}
           >
-            <span>🏆 Page 1 Wins</span>
-            <span className="font-mono text-[10px] bg-emerald-500/20 px-1.5 py-0.2 rounded-full">
-              {results.filter((r) => r.rank && r.rank <= 10).length}
-            </span>
+            <Trophy className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Top 10 Wins</span>
+            <span className="font-mono text-[11px] opacity-70">({page1Count})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectFilter('opportunities')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+              filter === 'opportunities'
+                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/60'
+                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Opportunities (11–30)</span>
+            <span className="font-mono text-[11px] opacity-70">({oppCount})</span>
           </button>
 
           {cannibalizedCount > 0 && (
             <button
-              onClick={() => setFilter('cannibalization')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              type="button"
+              onClick={() => handleSelectFilter('cannibalization')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                 filter === 'cannibalization'
-                  ? 'bg-rose-600 text-white shadow-sm'
-                  : 'text-rose-400 hover:bg-rose-500/10'
+                  ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/60'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
               }`}
             >
-              <span>⚠️ Cannibalization</span>
-              <span className="font-mono text-[10px] bg-rose-500/20 px-1.5 py-0.2 rounded-full">
-                {cannibalizedCount}
-              </span>
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span>Cannibalization</span>
+              <span className="font-mono text-[11px] opacity-70">({cannibalizedCount})</span>
             </button>
           )}
 
           {deltaCount > 0 && (
             <button
-              onClick={() => setFilter('deltas')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              type="button"
+              onClick={() => handleSelectFilter('deltas')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                 filter === 'deltas'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-indigo-400 hover:bg-indigo-500/10'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/60'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
               }`}
             >
-              <span>📈 Movements</span>
-              <span className="font-mono text-[10px] bg-indigo-500/20 px-1.5 py-0.2 rounded-full">
-                {deltaCount}
-              </span>
+              <TrendingUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Movements</span>
+              <span className="font-mono text-[11px] opacity-70">({deltaCount})</span>
             </button>
           )}
 
           <button
-            onClick={() => setFilter('not_found')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            type="button"
+            onClick={() => handleSelectFilter('not_found')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
               filter === 'not_found'
-                ? 'bg-slate-700 text-white'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700'
+                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
             }`}
           >
             Not Found
@@ -213,18 +234,19 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
         {/* Search & Export Toolbar */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Filter keyword..."
+              placeholder="Search keyword..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-7 py-1.5 rounded-xl bg-zinc-950/80 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 w-36 sm:w-48"
+              className="pl-8 pr-7 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-36 sm:w-44"
             />
             {search && (
               <button
+                type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -232,27 +254,30 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={handleCopyTSV}
             title="Copy as TSV (paste directly into Google Sheets)"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-zinc-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
           >
-            {clipCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <ClipboardCopy className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{clipCopied ? 'Copied!' : 'Copy'}</span>
+            {clipCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <ClipboardCopy className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{clipCopied ? 'Copied' : 'Copy'}</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onDownload('csv')}
             title="Download CSV report"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-zinc-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">CSV</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onDownload('xlsx')}
             title="Download Excel report"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Excel</span>
@@ -261,40 +286,40 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
       </div>
 
       {/* Main Data Table */}
-      <div className="bg-zinc-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-950/80 border-b border-slate-800/80 text-slate-400 font-bold uppercase tracking-wider">
+            <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 font-medium">
               <tr>
                 <th
                   onClick={() => toggleSort('rank')}
-                  className="py-3.5 px-4 cursor-pointer hover:text-slate-200 transition-colors w-24"
+                  className="py-3 px-4 cursor-pointer hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors w-24"
                 >
                   Rank {sortCol === 'rank' && (sortDir === 'asc' ? '▲' : '▼')}
                 </th>
                 <th
                   onClick={() => toggleSort('delta')}
-                  className="py-3.5 px-3 cursor-pointer hover:text-slate-200 transition-colors w-20"
+                  className="py-3 px-3 cursor-pointer hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors w-20"
                 >
                   Delta {sortCol === 'delta' && (sortDir === 'asc' ? '▲' : '▼')}
                 </th>
                 <th
                   onClick={() => toggleSort('keyword')}
-                  className="py-3.5 px-4 cursor-pointer hover:text-slate-200 transition-colors"
+                  className="py-3 px-4 cursor-pointer hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
                 >
                   Keyword {sortCol === 'keyword' && (sortDir === 'asc' ? '▲' : '▼')}
                 </th>
-                <th className="py-3.5 px-4">Ranking URL & SERP Status</th>
-                <th className="py-3.5 px-4 hidden lg:table-cell">Page Title</th>
-                <th className="py-3.5 px-3 hidden sm:table-cell">Locale / Device</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+                <th className="py-3 px-4">Ranking URL</th>
+                <th className="py-3 px-4 hidden lg:table-cell">Page Title</th>
+                <th className="py-3 px-3 hidden sm:table-cell">Locale / Device</th>
+                <th className="py-3 px-4 text-right">SERP X-Ray</th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/40">
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
+                  <td colSpan={7} className="py-12 text-center text-zinc-400 text-xs">
                     No keywords found matching this filter criteria.
                   </td>
                 </tr>
@@ -307,35 +332,33 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                   return (
                     <tr
                       key={res.id || res.keyword}
-                      onClick={() => setSelectedResult(res)}
-                      className={`group hover:bg-slate-800/30 cursor-pointer transition-colors ${
+                      onClick={() => handleOpenRow(res)}
+                      className={`group hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer transition-colors ${
                         isTop3
-                          ? 'border-l-2 border-l-amber-400/80'
-                          : isTop10
-                          ? 'border-l-2 border-l-emerald-400/80'
+                          ? 'bg-emerald-50/20 dark:bg-emerald-950/10'
                           : isOpp
-                          ? 'border-l-2 border-l-blue-400/80'
-                          : 'border-l-2 border-l-transparent'
+                          ? 'bg-amber-50/20 dark:bg-amber-950/10'
+                          : ''
                       }`}
                     >
-                      {/* Rank Badge */}
+                      {/* Rank Number */}
                       <td className="py-3.5 px-4 font-mono">
                         {res.rank !== null ? (
                           <span
-                            className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-black tabular-nums shadow-sm border ${
+                            className={`inline-flex items-center justify-center min-w-[28px] h-6 px-1.5 rounded-md text-xs font-semibold tabular-nums border ${
                               isTop3
-                                ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-black border-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.3)]'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
                                 : isTop10
-                                ? 'bg-gradient-to-br from-emerald-400 to-teal-600 text-black border-emerald-300 shadow-[0_0_10px_rgba(52,211,153,0.3)]'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60'
                                 : isOpp
-                                ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white border-blue-400'
-                                : 'bg-slate-800 text-slate-300 border-slate-700'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                                : 'bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700'
                             }`}
                           >
                             #{res.rank}
                           </span>
                         ) : (
-                          <span className="text-slate-500 font-medium">—</span>
+                          <span className="text-zinc-400 font-medium">—</span>
                         )}
                       </td>
 
@@ -343,33 +366,35 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                       <td className="py-3.5 px-3 font-mono">
                         {res.rank_delta !== null ? (
                           res.rank_delta > 0 ? (
-                            <span className="inline-flex items-center gap-0.5 text-emerald-400 font-bold tabular-nums">
+                            <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
                               <ArrowUpRight className="w-3.5 h-3.5" /> +{res.rank_delta}
                             </span>
                           ) : res.rank_delta < 0 ? (
-                            <span className="inline-flex items-center gap-0.5 text-rose-400 font-bold tabular-nums">
+                            <span className="inline-flex items-center gap-0.5 text-rose-600 dark:text-rose-400 font-semibold tabular-nums">
                               <ArrowDownRight className="w-3.5 h-3.5" /> {res.rank_delta}
                             </span>
                           ) : (
-                            <span className="text-slate-500 font-medium">0</span>
+                            <span className="text-zinc-400 font-medium flex items-center">
+                              <Minus className="w-3 h-3" />
+                            </span>
                           )
                         ) : res.rank !== null && res.previous_rank === null ? (
-                          <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 px-1.5 py-0.2 rounded">
                             NEW
                           </span>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span className="text-zinc-400">—</span>
                         )}
                       </td>
 
                       {/* Keyword Name */}
-                      <td className="py-3.5 px-4 font-semibold text-slate-100 group-hover:text-indigo-300 transition-colors">
+                      <td className="py-3.5 px-4 font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         <div className="flex items-center gap-2">
-                          <span className="truncate max-w-[200px]">{res.keyword}</span>
+                          <span className="truncate max-w-[220px]">{res.keyword}</span>
                           {res.cannibalization && (
                             <span
-                              title={`Cannibalization detected: ${res.matching_urls_count} URLs rank for this keyword`}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/25 px-1.5 py-0.5 rounded-md"
+                              title={`Keyword cannibalization: ${res.matching_urls_count} URLs rank for this term`}
+                              className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 px-1.5 py-0.2 rounded"
                             >
                               <AlertTriangle className="w-3 h-3" /> 2+ URLs
                             </span>
@@ -377,33 +402,31 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                         </div>
                       </td>
 
-                      {/* Ranking URL & status */}
-                      <td className="py-3.5 px-4 text-slate-400 max-w-[280px]">
+                      {/* Ranking URL */}
+                      <td className="py-3.5 px-4 text-zinc-500 dark:text-zinc-400 max-w-[260px]">
                         {res.ranking_url ? (
-                          <div className="truncate flex items-center gap-1.5">
-                            <span className="truncate text-slate-300 font-mono text-[11px]">
-                              {res.ranking_url}
-                            </span>
-                          </div>
+                          <span className="truncate block font-mono text-[11px] text-zinc-600 dark:text-zinc-300">
+                            {res.ranking_url}
+                          </span>
                         ) : (
-                          <span className="text-slate-500 italic">Not found in top results</span>
+                          <span className="text-zinc-400 italic">Not in top results</span>
                         )}
                       </td>
 
                       {/* Page Title */}
-                      <td className="py-3.5 px-4 text-slate-400 hidden lg:table-cell max-w-[220px]">
+                      <td className="py-3.5 px-4 text-zinc-500 dark:text-zinc-400 hidden lg:table-cell max-w-[220px]">
                         <span className="truncate block" title={res.page_title || ''}>
-                          {res.page_title || <span className="text-slate-600">—</span>}
+                          {res.page_title || <span className="text-zinc-400">—</span>}
                         </span>
                       </td>
 
                       {/* Locale & Device */}
-                      <td className="py-3.5 px-3 text-slate-500 hidden sm:table-cell whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                      <td className="py-3.5 px-3 text-zinc-400 hidden sm:table-cell whitespace-nowrap">
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <span className="flex items-center gap-1">
                             <Globe className="w-3 h-3 opacity-60" /> {res.country}
                           </span>
-                          <span className="text-[10px] text-slate-500">
+                          <span>
                             {res.device === 'desktop' ? <Monitor className="w-3 h-3 inline" /> : <Smartphone className="w-3 h-3 inline" />}
                           </span>
                         </div>
@@ -412,11 +435,12 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedResult(res);
+                            handleOpenRow(res);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-zinc-950 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer"
                         >
                           <span>X-Ray</span>
                           <ChevronRight className="w-3 h-3" />
@@ -433,37 +457,38 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
 
       {/* ── SERP X-Ray Modal Drawer ─────────────────────────────────── */}
       {selectedResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div
             className="fixed inset-0"
             onClick={() => setSelectedResult(null)}
           />
 
-          <div className="relative w-full max-w-2xl bg-zinc-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl overflow-hidden z-10 flex flex-col max-h-[90vh]">
             {/* Header */}
-            <div className="p-5 border-b border-slate-800 bg-zinc-950/80 flex items-start justify-between gap-4">
+            <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40 flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" /> SERP X-Ray Intelligence
+                  <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" /> SERP X-Ray Snapshot
                   </span>
                   {selectedResult.cannibalization && (
-                    <span className="text-[10px] font-bold text-rose-300 bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> Keyword Cannibalization Alert
+                    <span className="text-[11px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 px-2 py-0.2 rounded-md flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Cannibalization Detected
                     </span>
                   )}
                 </div>
-                <h3 className="text-lg font-bold text-white mt-1">
-                  "{selectedResult.keyword}"
+                <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mt-1">
+                  &ldquo;{selectedResult.keyword}&rdquo;
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Target Domain: <span className="font-mono text-slate-200">{domain}</span> • {selectedResult.country} ({selectedResult.device})
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Target Domain: <span className="font-mono text-zinc-700 dark:text-zinc-300">{domain}</span> • {selectedResult.country} ({selectedResult.device})
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={() => setSelectedResult(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-zinc-800/60 hover:bg-zinc-800 transition-colors"
+                className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -472,41 +497,41 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
             {/* Body */}
             <div className="p-5 space-y-4 overflow-y-auto">
               {/* Primary vs Secondary Ranking Details */}
-              <div className="p-4 rounded-2xl bg-zinc-950/70 border border-slate-800 space-y-2.5">
+              <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Your Best Ranking Result
+                  <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                    Your Best Ranking Position
                   </span>
-                  <span className="text-xs font-mono font-bold text-indigo-400">
+                  <span className="text-xs font-mono font-semibold text-blue-600 dark:text-blue-400">
                     {selectedResult.rank ? `Rank #${selectedResult.rank}` : 'Unranked'}
                   </span>
                 </div>
 
                 {selectedResult.ranking_url ? (
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-white">{selectedResult.page_title}</p>
+                    <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{selectedResult.page_title}</p>
                     <a
                       href={selectedResult.ranking_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-indigo-400 hover:underline flex items-center gap-1 font-mono break-all"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono break-all"
                     >
-                      {selectedResult.ranking_url}
+                      <span>{selectedResult.ranking_url}</span>
                       <ExternalLink className="w-3 h-3 shrink-0" />
                     </a>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500">Domain does not rank in the analyzed depth.</p>
+                  <p className="text-xs text-zinc-400">Domain was not found within searched depth.</p>
                 )}
 
                 {/* Secondary URL if cannibalized */}
                 {selectedResult.cannibalization && selectedResult.secondary_ranking_url && (
-                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-1 bg-rose-500/5 p-3 rounded-xl border border-rose-500/20">
+                  <div className="mt-3 pt-3 border-t border-rose-200/80 dark:border-rose-900/60 space-y-1 bg-rose-50/60 dark:bg-rose-950/20 p-3 rounded-lg border border-rose-200 dark:border-rose-900/60">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5" /> Competing Internal URL (Cannibalization)
+                      <span className="text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Competing Internal Page
                       </span>
-                      <span className="text-xs font-mono font-bold text-rose-400">
+                      <span className="text-xs font-mono font-bold text-rose-600 dark:text-rose-400">
                         Rank #{selectedResult.secondary_rank}
                       </span>
                     </div>
@@ -514,13 +539,13 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                       href={selectedResult.secondary_ranking_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-rose-300 hover:underline flex items-center gap-1 font-mono break-all"
+                      className="text-xs text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 font-mono break-all"
                     >
-                      {selectedResult.secondary_ranking_url}
+                      <span>{selectedResult.secondary_ranking_url}</span>
                       <ExternalLink className="w-3 h-3 shrink-0" />
                     </a>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Two separate pages from your domain are splitting ranking signals. Consolidate keyword targeting to a single primary URL.
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-normal">
+                      Two separate pages from your domain are competing for this exact term. Consider 301 redirecting or canonicalizing to the primary ranking URL.
                     </p>
                   </div>
                 )}
@@ -528,7 +553,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
 
               {/* Top 5 SERP Competitors Snapshot */}
               <div className="space-y-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                   Top 5 Organic Competitors on Google
                 </span>
 
@@ -541,21 +566,23 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                           key={comp.url}
                           className={`p-3 rounded-xl border text-xs flex items-start gap-3 transition-colors ${
                             isMe
-                              ? 'bg-indigo-600/10 border-indigo-500/40 text-indigo-200'
-                              : 'bg-zinc-950/60 border-slate-800/80 text-slate-300'
+                              ? 'bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900 text-blue-900 dark:text-blue-100'
+                              : 'bg-white dark:bg-zinc-800/40 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300'
                           }`}
                         >
                           <span
-                            className={`w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold shrink-0 ${
-                              comp.rank <= 3 ? 'bg-amber-400/20 text-amber-300' : 'bg-slate-800 text-slate-400'
+                            className={`w-6 h-6 rounded-md flex items-center justify-center font-mono font-semibold text-xs shrink-0 ${
+                              comp.rank <= 3
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
                             }`}
                           >
                             #{comp.rank}
                           </span>
                           <div className="min-w-0 flex-1 space-y-0.5">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-semibold text-slate-100 truncate">{comp.title}</span>
-                              <span className="font-mono text-[10px] text-slate-500 uppercase px-1.5 py-0.2 rounded bg-zinc-900 border border-slate-800 shrink-0">
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 truncate">{comp.title}</span>
+                              <span className="font-mono text-[10px] text-zinc-500 px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 shrink-0">
                                 {comp.domain}
                               </span>
                             </div>
@@ -563,7 +590,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                               href={comp.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[11px] text-slate-400 hover:text-indigo-400 flex items-center gap-1 font-mono truncate"
+                              className="text-[11px] text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 font-mono truncate"
                             >
                               <span className="truncate">{comp.url}</span>
                               <ExternalLink className="w-2.5 h-2.5 shrink-0" />
@@ -573,30 +600,31 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                       );
                     })
                   ) : (
-                    <p className="text-xs text-slate-500 py-3">No competitor snapshot available for this row.</p>
+                    <p className="text-xs text-zinc-400 py-3">No competitor snapshot available for this row.</p>
                   )}
                 </div>
               </div>
             </div>
 
             {/* Footer Action Buttons */}
-            <div className="p-4 border-t border-slate-800 bg-zinc-950/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 flex flex-col sm:flex-row items-center justify-between gap-3">
               <a
                 href={`https://www.google.com/search?q=${encodeURIComponent(selectedResult.keyword)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-slate-300 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all flex items-center justify-center gap-1.5"
+                className="w-full sm:w-auto px-3.5 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-lg transition-colors flex items-center justify-center gap-1.5"
               >
                 <span>Verify Live on Google</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
 
               <button
+                type="button"
                 onClick={() => handleCopyActionBrief(selectedResult)}
-                className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 rounded-xl transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
               >
-                {copiedBrief ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <ClipboardCopy className="w-3.5 h-3.5" />}
-                <span>{copiedBrief ? 'Copied Prompt!' : 'Copy AI SEO Action Brief'}</span>
+                {copiedBrief ? <Check className="w-3.5 h-3.5 text-white" /> : <ClipboardCopy className="w-3.5 h-3.5" />}
+                <span>{copiedBrief ? 'Copied Prompt!' : 'Copy AI Optimization Brief'}</span>
               </button>
             </div>
           </div>

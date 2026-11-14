@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   History, Search, Download, Trash2, Building2,
-  Calendar, RefreshCw, Loader2, ArrowRight, ShieldCheck, Activity
+  Calendar, RefreshCw, Loader2, ArrowRight
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { HistoryJob } from '../../types';
@@ -59,9 +59,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onLoadJob, onAddToast 
     try {
       await apiClient.deleteJob(jobId);
       setJobs((prev) => prev.filter((j) => j.job_id !== jobId));
-      onAddToast('success', 'Scan and export artifacts deleted.');
+      onAddToast('info', 'Scan deleted from history.');
     } catch {
-      onAddToast('error', 'Failed to delete scan.');
+      onAddToast('error', 'Could not delete scan.');
     } finally {
       setDeletingId(null);
     }
@@ -75,212 +75,135 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onLoadJob, onAddToast 
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2">
-            <History className="w-5 h-5 text-indigo-400" /> Scan Archive & Historical Intelligence
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <History className="w-5 h-5 text-blue-600 dark:text-blue-400" strokeWidth={1.75} />
+            Scan History Archive
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Access past ranking scans, compare delta progress, and download historical reports.
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            Browse and reload past rank tracking audits or download archived spreadsheets.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search company or domain..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 rounded-xl bg-zinc-900 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 w-52"
-            />
-          </div>
-
-          <button
-            onClick={fetchHistory}
-            className="p-2 text-slate-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-slate-800 rounded-xl transition-colors cursor-pointer"
-            title="Refresh history"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={fetchHistory}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer self-start sm:self-auto"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      {/* Main Table */}
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          placeholder="Filter by company, domain, or provider..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      {/* Scans List / Table */}
       {isLoading ? (
-        <div className="bg-zinc-900/60 border border-slate-800 rounded-3xl p-16 flex flex-col items-center justify-center text-slate-500 gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-          <p className="text-sm">Loading historical scans...</p>
+        <div className="p-16 text-center text-zinc-400 flex flex-col items-center justify-center gap-2">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+          <span className="text-xs">Loading past scans...</span>
         </div>
       ) : filteredJobs.length === 0 ? (
-        <div className="bg-zinc-900/60 border border-slate-800 rounded-3xl p-16 flex flex-col items-center justify-center text-center text-slate-500 gap-3">
-          <History className="w-10 h-10 opacity-30" />
-          <p className="text-sm font-semibold text-slate-300">No scans found</p>
-          <p className="text-xs max-w-xs text-slate-500">
-            {search ? 'Try clearing the search query.' : 'Launch your first automated keyword scan from the Launchpad.'}
-          </p>
+        <div className="p-16 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-500 text-xs">
+          No scans found in history.
         </div>
       ) : (
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-950/80 border-b border-slate-800/80 text-slate-400 font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="py-3.5 px-5">Target Domain</th>
-                  <th className="py-3.5 px-4 hidden md:table-cell">Provider</th>
-                  <th className="py-3.5 px-4 text-center">Keywords</th>
-                  <th className="py-3.5 px-4 text-center">Found %</th>
-                  <th className="py-3.5 px-4 text-center">Visibility</th>
-                  <th className="py-3.5 px-4 hidden lg:table-cell">Date</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-5 text-right">Actions</th>
-                </tr>
-              </thead>
+        <div className="space-y-3">
+          {filteredJobs.map((job) => {
+            const isCompleted = job.status === 'completed';
+            const isFailed = job.status === 'failed';
 
-              <tbody className="divide-y divide-slate-800/40">
-                {filteredJobs.map((job) => {
-                  const foundPct =
-                    job.keyword_count > 0 ? Math.round((job.found_count / job.keyword_count) * 100) : 0;
+            return (
+              <div
+                key={job.job_id}
+                onClick={() => onLoadJob(job.job_id)}
+                className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+              >
+                <div className="flex items-start gap-3.5">
+                  <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0 mt-0.5">
+                    <Building2 className="w-4 h-4" strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {job.company_name}
+                      </h4>
+                      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                        {job.domain}
+                      </span>
+                      <span
+                        className={`text-[10px] font-medium px-2 py-0.2 rounded-md ${
+                          isCompleted
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : isFailed
+                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                            : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                        }`}
+                      >
+                        {job.status}
+                      </span>
+                    </div>
 
-                  return (
-                    <tr
-                      key={job.job_id}
-                      onClick={() => onLoadJob(job.job_id)}
-                      className="group hover:bg-slate-800/30 cursor-pointer transition-colors"
-                    >
-                      {/* Domain and Company */}
-                      <td className="py-4 px-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                            <Building2 className="w-4 h-4 text-indigo-400" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-100 truncate group-hover:text-indigo-300 transition-colors">
-                              {job.company_name}
-                            </p>
-                            <p className="text-[11px] font-mono text-slate-400 truncate">{job.domain}</p>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Engine */}
-                      <td className="py-4 px-4 hidden md:table-cell">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-300 bg-zinc-950 px-2 py-0.5 rounded-lg border border-slate-800 capitalize">
-                          {job.provider === 'free' ? (
-                            <>
-                              <ShieldCheck className="w-3 h-3 text-emerald-400" /> Free Live
-                            </>
-                          ) : job.provider === 'mock' ? (
-                            'Smart Sim'
-                          ) : (
-                            'SerpApi'
-                          )}
+                    <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 mt-1 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3 opacity-60" />
+                        {job.created_at ? new Date(job.created_at).toLocaleString() : 'Recent'}
+                      </span>
+                      <span>Engine: <span className="font-medium text-zinc-700 dark:text-zinc-300 capitalize">{job.provider}</span></span>
+                      <span>Keywords: <span className="font-mono font-medium text-zinc-700 dark:text-zinc-300">{job.found_count}/{job.keyword_count}</span></span>
+                      {isCompleted && (
+                        <span className="text-blue-600 dark:text-blue-400 font-medium font-mono">
+                          SoV: {job.visibility_score.toFixed(1)}%
                         </span>
-                      </td>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-                      {/* Keywords Count */}
-                      <td className="py-4 px-4 text-center font-mono font-bold text-slate-200">
-                        {job.keyword_count}
-                      </td>
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  <a
+                    href={apiClient.getDownloadUrl(job.job_id, 'xlsx')}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Download Excel spreadsheet"
+                    className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </a>
 
-                      {/* Found % */}
-                      <td className="py-4 px-4 text-center">
-                        <span
-                          className={`font-mono font-bold ${
-                            foundPct >= 50 ? 'text-emerald-400' : foundPct >= 20 ? 'text-amber-400' : 'text-slate-400'
-                          }`}
-                        >
-                          {foundPct}%
-                        </span>
-                        <span className="text-[10px] text-slate-500 block">
-                          ({job.found_count}/{job.keyword_count})
-                        </span>
-                      </td>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDelete(e, job.job_id)}
+                    disabled={deletingId === job.job_id}
+                    title="Delete scan from history"
+                    className="p-2 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
 
-                      {/* Visibility Score */}
-                      <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center gap-1 font-mono font-bold text-indigo-300">
-                          <Activity className="w-3.5 h-3.5 text-indigo-400" />
-                          {job.visibility_score ? `${job.visibility_score.toFixed(1)}%` : '0%'}
-                        </span>
-                      </td>
-
-                      {/* Date */}
-                      <td className="py-4 px-4 hidden lg:table-cell text-slate-400">
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <Calendar className="w-3 h-3 text-slate-500" />
-                          <span>
-                            {job.created_at
-                              ? new Date(job.created_at).toLocaleDateString(undefined, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : '—'}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-4 px-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            job.status === 'completed'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : job.status === 'failed'
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                              : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                          }`}
-                        >
-                          {job.status}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-4 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => onLoadJob(job.job_id)}
-                            className="p-1.5 text-indigo-400 hover:text-white bg-indigo-500/10 hover:bg-indigo-600 rounded-lg border border-indigo-500/20 transition-all cursor-pointer"
-                            title="Inspect scan"
-                          >
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-
-                          {job.status === 'completed' && (
-                            <a
-                              href={apiClient.getDownloadUrl(job.job_id, 'xlsx')}
-                              className="p-1.5 text-slate-400 hover:text-white bg-zinc-950 hover:bg-slate-800 rounded-lg border border-slate-800 transition-all"
-                              title="Download Excel"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-
-                          <button
-                            onClick={(e) => handleDelete(e, job.job_id)}
-                            disabled={deletingId === job.job_id}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer"
-                            title="Delete scan"
-                          >
-                            {deletingId === job.job_id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  <div className="pl-2 border-l border-zinc-200 dark:border-zinc-800">
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      View Results
+                      <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

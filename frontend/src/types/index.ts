@@ -9,7 +9,13 @@ export type KeywordStatus =
   | 'timeout'
   | 'invalid';
 
-export type ViewType = 'new-scan' | 'opportunities' | 'competitors' | 'history';
+export type ViewType = 'new-scan' | 'opportunities' | 'competitors' | 'history' | 'help';
+
+export interface OnboardingState {
+  demoRun: boolean;
+  opportunitiesViewed: boolean;
+  xrayInspected: boolean;
+}
 
 export type SortCol = 'keyword' | 'rank' | 'delta';
 export type SortDir = 'asc' | 'desc';

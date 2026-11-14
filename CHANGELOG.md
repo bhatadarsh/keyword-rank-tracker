@@ -7,6 +7,35 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ## 2026-11-14
 
+### Version 2.1.0 — Human-Crafted SaaS Redesign & Built-In Help Center
+
+**[REFACTOR]** **Human-Crafted SaaS Visual Identity (Linear & Stripe Aesthetic)**:
+- **Typography Overhaul**: Replaced `Outfit` with `Inter` (`weights 400, 500, 600, 700`) as the primary UI font across the entire application with antialiased font smoothing and OpenType contextual features (`cv02`, `cv03`, `cv04`, `cv11`). Pinned `JetBrains Mono` strictly for tabular-nums rank badges, deltas, and URLs.
+- **True Neutral Palette**: Defaulted to crisp, airy Light Mode (`#FAFAFA` canvas, `#FFFFFF` surface cards, `#E4E4E7` 1px borders) with a true-neutral Dark Mode toggle (`#09090B` Zinc-950 canvas, `#121215` surface cards, `#27272A` borders). Eliminated all muddy dark-blue backgrounds, glowing neon borders, and glassmorphism clutter.
+- **Emoji Elimination**: Stripped all emojis (`🚀`, `🔥`, `🏆`, `⚠️`, `🌐`, `📊`, etc.) from UI buttons, badges, table cells, and headings, replacing them with uniform, clean `lucide-react` icons.
+- **Breathing Room & Table Comfort**: Expanded outer container padding to `px-6 py-8` / `px-8 py-8`, flattened nested card borders, and expanded data grid row padding to `py-3.5 px-4`.
+
+**[FEAT]** **Built-In Help & Documentation Center (`frontend/src/components/help/HelpView.tsx`)**:
+- Added dedicated Help & Glossary view accessible via the navigation sidebar and `Cmd+K` Command Palette.
+- Features real-time search filtering across 4 comprehensive sections:
+  1. **How NexusRank Works**: 3-step pipeline walkthrough.
+  2. **Feature & Metric Glossary**: Plain-English explanations of Striking-Distance Opportunities (11–30), Organic Visibility Score (SoV %), Keyword Cannibalization, SERP X-Ray, Rank Deltas, and Competitor Dominance Matrix.
+  3. **Search Engine Comparison**: Side-by-side comparison of `Free Live Search` ($0 zero keys), `Smart Simulation`, and `SerpApi`.
+  4. **CSV / Excel Input Specification**: Column definitions and a 1-click **Download Sample CSV** button.
+
+**[FEAT]** **Dismissible 3-Step Interactive Welcome Guide (`WelcomeGuideBanner.tsx` & `useOnboarding.ts`)**:
+- Added an inline 3-step interactive onboarding card on the home screen:
+  - **Step 1**: Run 1-Click Sample Scan (direct **"Run GitHub.com Demo"** button triggers scan immediately).
+  - **Step 2**: Filter Striking-Distance Opportunities (auto-tracks when user selects Opportunities filter tab).
+  - **Step 3**: Inspect SERP X-Ray & Copy an AI Brief (auto-tracks when user expands a keyword row).
+- Full state persistence in `localStorage` (`nexusrank_onboarding_progress` and `nexusrank_welcome_dismissed`).
+- Added **"Restart Welcome Guide"** button inside the Help Center to replay the walkthrough anytime.
+
+**[FEAT]** **Contextual Metric Tooltips (`InfoTooltip.tsx`)**:
+- Created an accessible `HelpCircle` popover tooltip attached to Visibility Score, Striking-Distance Opportunities, Keyword Cannibalization, and Search Depth.
+
+---
+
 ### Version 2.0.1 — Cross-Platform Launchers & Universal Onboarding Guide
 
 **[FEAT]** **Zero-Config Cross-Platform Dev Launchers**:

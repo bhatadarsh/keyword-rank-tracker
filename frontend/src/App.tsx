@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   PlusCircle, RefreshCw, CheckCircle2,
-  AlertCircle, Info, X, Zap
+  AlertCircle, Info, X, Zap, Target
 } from 'lucide-react';
 import { apiClient } from './api/client';
 import { AppShell } from './components/layout/AppShell';
@@ -11,6 +11,9 @@ import { BentoAnalyticsHeader } from './components/results/BentoAnalyticsHeader'
 import { ResultsDataGrid } from './components/results/ResultsDataGrid';
 import { CompetitorMatrixView } from './components/results/CompetitorMatrixView';
 import { HistoryView } from './components/history/HistoryView';
+import { HelpView } from './components/help/HelpView';
+import { WelcomeGuideBanner } from './components/onboarding/WelcomeGuideBanner';
+import { useOnboarding } from './hooks/useOnboarding';
 import type {
   JobDetails, HistoryJob, ConfigResponse,
   ViewType, ToastItem
@@ -23,12 +26,25 @@ export default function App() {
   const [historyJobs, setHistoryJobs] = useState<HistoryJob[]>([]);
   const [isLoadingScan, setIsLoadingScan] = useState<boolean>(false);
   const [isCommandOpen, setIsCommandOpen] = useState<boolean>(false);
+
+  // Default to Light Mode as per human-crafted SaaS specification
   const [isDark, setIsDark] = useState<boolean>(() => {
-    return localStorage.getItem('nexus_theme') !== 'light';
+    return localStorage.getItem('nexus_theme') === 'dark';
   });
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 3-Step Interactive Onboarding State
+  const {
+    completedSteps,
+    completedCount,
+    isAllCompleted,
+    isDismissed,
+    markStepComplete,
+    dismissGuide,
+    resetGuide,
+  } = useOnboarding();
 
   // Toast dispatch helper
   const addToast = useCallback((type: ToastItem['type'], message: string) => {
@@ -36,7 +52,7 @@ export default function App() {
     setToasts((prev) => [...prev, { id, type, message }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
+    }, 4000);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -98,11 +114,28 @@ export default function App() {
     [addToast]
   );
 
+  // If user navigates to Opportunities or Competitors without an active job, auto-load latest scan
+  const handleNavigate = useCallback(
+    async (view: ViewType) => {
+      if ((view === 'opportunities' || view === 'competitors') && !activeJob && historyJobs.length > 0) {
+        try {
+          const latest = await apiClient.getJobStatus(historyJobs[0].job_id);
+          setActiveJob(latest);
+        } catch {
+          // Ignore
+        }
+      }
+      setActiveView(view);
+    },
+    [activeJob, historyJobs]
+  );
+
   // Start new scan submission
   const handleStartScan = async (formData: FormData) => {
     setIsLoadingScan(true);
     try {
       const res = await apiClient.createJob(formData);
+      markStepComplete('demoRun');
       addToast('info', `Scan queued on ${res.provider.toUpperCase()} engine (${res.keyword_count} keywords)`);
 
       // Immediately fetch job state
@@ -114,6 +147,35 @@ export default function App() {
     } finally {
       setIsLoadingScan(false);
     }
+  };
+
+  // Direct trigger for 1-click GitHub demo from welcome banner
+  const handleRunDemoFromBanner = async () => {
+    const csvContent =
+      'keyword,country,language,device\n' +
+      'git repository,United States,English,desktop\n' +
+      'code review tool,United States,English,desktop\n' +
+      'version control,United States,English,desktop\n' +
+      'open source hosting,United States,English,desktop\n' +
+      'pull request workflow,United States,English,desktop\n' +
+      'github actions ci cd,United States,English,desktop\n' +
+      'git clone tutorial,United States,English,desktop\n' +
+      'devops platform,United States,English,desktop\n' +
+      'collaborative coding,United States,English,desktop\n' +
+      'issue tracking software,United States,English,desktop';
+
+    const demoFile = new File([csvContent], 'demo_github_keywords.csv', { type: 'text/csv' });
+    const formData = new FormData();
+    formData.append('file', demoFile);
+    formData.append('company_name', 'GitHub');
+    formData.append('domain', 'github.com');
+    formData.append('provider', config?.default_provider || 'free');
+    formData.append('country', 'United States');
+    formData.append('language', 'English');
+    formData.append('device', 'desktop');
+    formData.append('depth', '100');
+
+    await handleStartScan(formData);
   };
 
   // Smart Polling: pauses when tab is hidden, resumes on focus
@@ -173,7 +235,7 @@ export default function App() {
   return (
     <AppShell
       activeView={activeView}
-      onNavigate={setActiveView}
+      onNavigate={handleNavigate}
       onOpenCommandPalette={() => setIsCommandOpen(true)}
       onToggleTheme={toggleTheme}
       isDark={isDark}
@@ -192,51 +254,81 @@ export default function App() {
               countries={config?.countries || ['United States', 'India', 'United Kingdom']}
               languages={config?.languages || ['English', 'Spanish', 'German']}
               isLoading={isLoadingScan}
+              onboardingBanner={
+                !isDismissed ? (
+                  <WelcomeGuideBanner
+                    completedSteps={completedSteps}
+                    completedCount={completedCount}
+                    isAllCompleted={isAllCompleted}
+                    onDismiss={dismissGuide}
+                    onRunDemo={handleRunDemoFromBanner}
+                    hasActiveJob={false}
+                  />
+                ) : null
+              }
             />
           ) : (
             <div className="space-y-6">
+              {/* Optional Onboarding banner on top of active results if not dismissed */}
+              {!isDismissed && (
+                <WelcomeGuideBanner
+                  completedSteps={completedSteps}
+                  completedCount={completedCount}
+                  isAllCompleted={isAllCompleted}
+                  onDismiss={dismissGuide}
+                  onRunDemo={handleRunDemoFromBanner}
+                  onViewOpportunities={() => {
+                    markStepComplete('opportunitiesViewed');
+                    setActiveView('opportunities');
+                  }}
+                  hasActiveJob={true}
+                />
+              )}
+
               {/* Scan Header Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-5">
-                <div className="flex items-center gap-3.5">
-                  <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                    <Zap className="w-5 h-5" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <Zap className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-lg font-black text-white">{activeJob.company_name}</h2>
-                      <span className="font-mono text-xs text-slate-400 bg-zinc-950 px-2 py-0.5 rounded-lg border border-slate-800">
+                      <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{activeJob.company_name}</h2>
+                      <span className="font-mono text-xs text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
                         {activeJob.domain}
                       </span>
                       <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
                           activeJob.status === 'completed'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                             : activeJob.status === 'failed'
-                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                            : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
                         }`}
                       >
                         {activeJob.status}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                       {activeJob.progress.completed} of {activeJob.progress.total} keywords processed ({activeJob.progress.percent}%)
-                      {isJobRunning && <span className="text-indigo-400 ml-1.5">• In progress</span>}
+                      {isJobRunning && <span className="text-blue-600 dark:text-blue-400 ml-1.5">• In progress</span>}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setActiveJob(null)}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
                     <span>New Scan</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleLoadJob(activeJob.job_id)}
-                    className="p-2 text-slate-400 hover:text-white bg-zinc-950 hover:bg-slate-800 rounded-xl border border-slate-800 transition-all cursor-pointer"
+                    className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     title="Refresh current scan"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -252,7 +344,12 @@ export default function App() {
                 topCompetitors={activeJob.top_competitors_summary || []}
                 cannibalizedCount={cannibalizedCount}
                 onFilterClick={(key) => {
-                  if (key === 'competitors') setActiveView('competitors');
+                  if (key === 'opportunities') {
+                    markStepComplete('opportunitiesViewed');
+                    setActiveView('opportunities');
+                  } else if (key === 'competitors') {
+                    setActiveView('competitors');
+                  }
                 }}
               />
 
@@ -262,23 +359,26 @@ export default function App() {
                 domain={activeJob.domain}
                 onDownload={handleDownload}
                 onAddToast={addToast}
+                onFilterOpportunities={() => markStepComplete('opportunitiesViewed')}
+                onExpandRow={() => markStepComplete('xrayInspected')}
               />
             </div>
           )}
         </div>
       )}
 
-      {/* ── View 2: Opportunities Vault ─────────────────────────────── */}
+      {/* ── View 2: Results & Opportunities Vault ───────────────────── */}
       {activeView === 'opportunities' && (
         <div className="space-y-6">
           {activeJob ? (
             <div className="space-y-6">
-              <div className="p-6 rounded-3xl bg-blue-950/30 border border-blue-500/30 text-blue-200">
-                <h3 className="text-base font-bold flex items-center gap-2 text-white">
-                  <span>🔥 Striking Distance Opportunities Vault</span>
+              <div className="p-5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Target className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span>Striking-Distance Opportunities Vault</span>
                 </h3>
-                <p className="text-xs text-blue-300 mt-1">
-                  Keywords currently ranking 11–30. These are your highest-ROI targets: small on-page optimizations or internal links can push them onto Page 1!
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 leading-relaxed">
+                  Keywords currently ranking in positions 11–30. These are your highest-ROI targets: search engines already recognize your authority, so minor on-page optimizations or internal links can push them onto Page 1!
                 </p>
               </div>
 
@@ -287,17 +387,19 @@ export default function App() {
                 domain={activeJob.domain}
                 onDownload={handleDownload}
                 onAddToast={addToast}
+                onExpandRow={() => markStepComplete('xrayInspected')}
               />
             </div>
           ) : (
-            <div className="bg-zinc-900/60 border border-slate-800 rounded-3xl p-16 text-center text-slate-500 space-y-3">
-              <p className="text-sm font-semibold text-slate-300">No active scan selected</p>
-              <p className="text-xs max-w-sm mx-auto text-slate-500">
-                Run a new scan or select a scan from history to populate the Opportunities Vault.
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-16 text-center text-zinc-500 space-y-3 shadow-xs">
+              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">No active scan loaded</p>
+              <p className="text-xs max-w-sm mx-auto text-zinc-500">
+                Run a new scan or choose a past audit from History to isolate striking-distance opportunities.
               </p>
               <button
+                type="button"
                 onClick={() => setActiveView('new-scan')}
-                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg cursor-pointer transition-colors shadow-xs"
               >
                 Go to Launchpad
               </button>
@@ -316,14 +418,15 @@ export default function App() {
               results={activeJob.results}
             />
           ) : (
-            <div className="bg-zinc-900/60 border border-slate-800 rounded-3xl p-16 text-center text-slate-500 space-y-3">
-              <p className="text-sm font-semibold text-slate-300">No active scan selected</p>
-              <p className="text-xs max-w-sm mx-auto text-slate-500">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-16 text-center text-zinc-500 space-y-3 shadow-xs">
+              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">No active scan loaded</p>
+              <p className="text-xs max-w-sm mx-auto text-zinc-500">
                 Run a scan to extract competitive intelligence and Page 1 market share.
               </p>
               <button
+                type="button"
                 onClick={() => setActiveView('new-scan')}
-                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg cursor-pointer transition-colors shadow-xs"
               >
                 Go to Launchpad
               </button>
@@ -337,11 +440,20 @@ export default function App() {
         <HistoryView onLoadJob={handleLoadJob} onAddToast={addToast} />
       )}
 
+      {/* ── View 5: Help & Documentation ────────────────────────────── */}
+      {activeView === 'help' && (
+        <HelpView
+          onResetGuide={resetGuide}
+          onNavigateHome={() => setActiveView('new-scan')}
+          onAddToast={addToast}
+        />
+      )}
+
       {/* Command Palette Modal (Cmd+K) */}
       <CommandPalette
         isOpen={isCommandOpen}
         onClose={() => setIsCommandOpen(false)}
-        onNavigate={setActiveView}
+        onNavigate={handleNavigate}
         onLoadJob={handleLoadJob}
         onDownload={handleDownload}
         onToggleTheme={toggleTheme}
@@ -356,26 +468,27 @@ export default function App() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto p-4 rounded-2xl border backdrop-blur-xl shadow-2xl flex items-start justify-between gap-3 animate-slide-up ${
+            className={`pointer-events-auto p-3.5 rounded-xl border shadow-lg flex items-start justify-between gap-3 animate-fade-in ${
               toast.type === 'success'
-                ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-200'
+                ? 'bg-white dark:bg-zinc-900 border-emerald-200 dark:border-emerald-800/80 text-zinc-800 dark:text-zinc-100'
                 : toast.type === 'error'
-                ? 'bg-rose-950/90 border-rose-500/30 text-rose-200'
+                ? 'bg-white dark:bg-zinc-900 border-rose-200 dark:border-rose-800/80 text-zinc-800 dark:text-zinc-100'
                 : toast.type === 'warning'
-                ? 'bg-amber-950/90 border-amber-500/30 text-amber-200'
-                : 'bg-zinc-900/90 border-slate-800 text-slate-200'
+                ? 'bg-white dark:bg-zinc-900 border-amber-200 dark:border-amber-800/80 text-zinc-800 dark:text-zinc-100'
+                : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-100'
             }`}
           >
             <div className="flex items-start gap-2.5">
-              {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />}
-              {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />}
-              {toast.type === 'warning' && <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />}
-              {toast.type === 'info' && <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />}
-              <p className="text-xs font-medium leading-relaxed">{toast.message}</p>
+              {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />}
+              {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />}
+              {toast.type === 'warning' && <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
+              {toast.type === 'info' && <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />}
+              <p className="text-xs font-normal leading-relaxed">{toast.message}</p>
             </div>
             <button
+              type="button"
               onClick={() => removeToast(toast.id)}
-              className="opacity-50 hover:opacity-100 text-current transition-opacity shrink-0 cursor-pointer"
+              className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors shrink-0 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>

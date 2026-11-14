@@ -1,37 +1,52 @@
-/* ── Google Font — Outfit for a modern tech feel ─────────── */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* ── Google Fonts: Inter & JetBrains Mono ───────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* Tailwind v4 */
 @import "tailwindcss";
 
-/* ── Global base styles ────────────────────────────────────────────── */
+/* ── Global Base Styles & Design Tokens ─────────────────────────── */
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
   }
 
   :root {
-    --bg-canvas: #090d16;
-    --bg-surface: #111827;
-    --border-subtle: #1e293b;
-    --text-primary: #f8fafc;
-    --text-muted: #94a3b8;
+    --bg-page: #FAFAFA;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F4F4F5;
+    --border-subtle: #E4E4E7;
+    --text-primary: #18181B;
+    --text-secondary: #52525B;
+    --text-muted: #71717A;
+    --accent: #2563EB;
   }
 
-  .light {
-    --bg-canvas: #f8fafc;
-    --bg-surface: #ffffff;
-    --border-subtle: #e2e8f0;
-    --text-primary: #0f172a;
-    --text-muted: #64748b;
+  .dark {
+    --bg-page: #09090B;
+    --bg-surface: #121215;
+    --bg-subtle: #18181B;
+    --border-subtle: #27272A;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
+    --accent: #3B82F6;
   }
 
   html {
-    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Thin, clean neutral scrollbars */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -40,46 +55,35 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #272f45;
+    background: #D4D4D8;
     border-radius: 9999px;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #3b4566;
+  .dark ::-webkit-scrollbar-thumb {
+    background: #27272A;
   }
-
-  body {
-    background-color: var(--bg-canvas);
-    color: var(--text-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
+  ::-webkit-scrollbar-thumb:hover {
+    background: #A1A1AA;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #3F3F46;
   }
 }
 
+/* ── Utility Classes ─────────────────────────────────────────────── */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
 .mono-font {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-up {
-  animation: slideInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.animate-fade-in {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
