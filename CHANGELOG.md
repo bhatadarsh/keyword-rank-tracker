@@ -5,6 +5,50 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ---
 
+## 2026-11-14
+
+### Version 2.0 — Open-Source Zero-Cost SEO & SERP Intelligence Platform
+
+**[FEAT]** **100% Zero-Cost Multi-Engine SERP Architecture (`backend/providers/`)**:
+- Added `FreeSerpProvider` (`backend/providers/free_serp_provider.py`) enabling zero-key live search via DuckDuckGo Lite and SearXNG with User-Agent rotation and graceful fallback.
+- Overhauled `MockProvider` (`backend/providers/mock_provider.py`): eliminated hardcoded `hiree.com`, implemented dynamic domain injection with deterministic SHA-256 seeding, multi-URL cannibalization simulation, and realistic competitor SERP generation.
+- Fixed `SerpApiProvider` depth pagination: queries with `depth > 100` (e.g. 200 or 500) now correctly paginate through `start = page * 100` and map organic positions accurately.
+- Added `GET /api/config` single source of truth for providers, supported countries, and languages.
+
+**[FEAT]** **Zero-Cost "Killer" SEO Intelligence Suite (`backend/services/`)**:
+- **Organic Visibility Index & Share-of-Voice (SoV)**: Weighted click-through score (0–100%) calculated per-keyword and job-level using industry-standard organic CTR decay curves.
+- **Keyword Cannibalization Detection**: Automatically flags when 2 or more distinct URLs from the target domain rank for the same keyword, recording secondary URLs and secondary rank positions.
+- **Top 5 SERP Snapshot**: Stores rich organic competitor metadata (#1–#5 URLs, titles, and domains) for every keyword row.
+- **Automatic Competitor Discovery**: Aggregates top Page 1 competing domains across all keywords in a scan to reveal top domains capturing organic search volume.
+- **Historical Rank Delta Tracking**: Automatically correlates past scans for the same domain and parameters, populating `previous_rank` and `rank_delta` (`+5`, `-2`, `NEW`).
+
+**[FEAT]** **Zero-Friction Auto-Migration & Crash Recovery (`backend/database.py`)**:
+- Implemented `ensure_schema_columns()`: dynamic startup schema sync that inspects `PRAGMA table_info` and executes non-destructive `ALTER TABLE ADD COLUMN` for new fields.
+- Implemented `reconcile_orphan_jobs()`: on server startup, finds any jobs stuck in `queued` or `processing` from an unexpected crash and marks them `failed`.
+- Added `DELETE /api/rank-check/{job_id}`: cleanly deletes jobs, keyword tasks, and associated export files.
+
+**[REFACTOR]** **Modular SaaS Frontend Architecture ("Obsidian & Linear Precision" UI)**:
+- Replaced monolithic 998-line `App.tsx` with a modular architecture:
+  - `src/types/index.ts`: Strict TypeScript contracts.
+  - `src/api/client.ts`: Typed Axios API client.
+  - `src/components/layout/AppShell.tsx`: Collapsible navigation, engine indicators, and theme controls.
+  - `src/components/common/CommandPalette.tsx`: Global `Cmd+K` / `Ctrl+K` command palette.
+  - `src/components/scan/ScanLaunchpad.tsx`: Drag-and-drop CSV uploader with instant client-side preview and 1-Click Demo presets for GitHub and Wikipedia.
+  - `src/components/results/BentoAnalyticsHeader.tsx`: Visibility SoV gauge, 5-tier distribution cards, and competitor preview.
+  - `src/components/results/ResultsDataGrid.tsx`: Smart filter tabs, tabular-nums rank/delta badges, and interactive SERP X-Ray drawer with 1-click "Copy AI SEO Action Brief" prompt.
+  - `src/components/results/CompetitorMatrixView.tsx`: Dedicated Page 1 competitor dominance matrix.
+  - `src/components/history/HistoryView.tsx`: Searchable scan archive with status badges and one-click deletion.
+- Added smart polling: automatically pauses 2-second poll interval when browser tab is hidden and resumes on focus.
+
+**[CHORE]** **Docker & CI/CD DevOps**:
+- Added `backend/Dockerfile` and `frontend/Dockerfile` with Nginx reverse proxy.
+- Added root `docker-compose.yml` for 1-command startup (`docker compose up --build`).
+- Added `.github/workflows/ci.yml` running pytest and npm build on every push and PR.
+- Added 10 new unit tests in `backend/tests/test_seo_analytics.py`; all 33 tests pass in <1s.
+- Cleaned all oxlint warnings (0 errors, 0 warnings).
+
+---
+
 ## 2026-09-07
 
 ### Session 7 — Unique Production Features for SEO Associates
@@ -52,7 +96,6 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ---
 
-
 ### Session 5 — Premium Dark Mode UI Overhaul
 
 **[FEAT]** Completely redesigned the frontend aesthetic to a Premium Dark Mode (Vercel/Linear style), replacing the basic Tailwind template look:
@@ -66,7 +109,6 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 ---
 
 ### Session 4 — Live SerpApi Testing & Stability Improvements
-> Git commits: `fe088c9`, `1c5a080`
 
 **[FIX]** `backend/services/job_processor.py` — Added **retry with exponential backoff** for `rate_limited` and `timeout` responses:
   - Up to **3 automatic retries** per keyword before marking as permanently failed
@@ -75,112 +117,14 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 **[CHORE]** Switched `SERP_PROVIDER=serpapi` in `backend/.env` — first live test with real Google organic data conducted successfully.
 
-**[TEST]** `test_github.csv` [NEW] — 10 keywords for `github.com` across India, US, UK to verify live ranking detection (expected: rank 1–5 for "github", "code repository").
+**[TEST]** `test_github.csv` [NEW] — 10 keywords for `github.com` across India, US, UK to verify live ranking detection.
 
-**[TEST]** `test_wikipedia.csv` [NEW] — 10 informational keywords for `wikipedia.org` as a gold-standard verification test (expected: rank 1 for "free encyclopedia", "wikipedia").
-
-**[DOCS]** `CHANGELOG.md` — Backfilled Session 3 entries; established daily log format with git commit hash references.
+**[TEST]** `test_wikipedia.csv` [NEW] — 10 informational keywords for `wikipedia.org` as a gold-standard verification test.
 
 ---
 
 ### Session 3 — Bug Fixes & Dev Launcher
-> Git commit: `92230b8`
 
-**[FIX]** `frontend/src/index.css` — Moved Google Fonts `@import` above `@import "tailwindcss"`. PostCSS requires all `@import` statements to be consecutive and come before any other rules.
-
-**[FIX]** `backend/rank_tracker.db` — Deleted stale SQLite database that was missing the new `page_title` column. SQLAlchemy `create_all` does not add columns to existing tables; DB is auto-recreated on next startup with the correct schema.
-
-**[FEAT]** `start.ps1` [NEW] — Single PowerShell launcher that starts both the FastAPI backend and React frontend in separate terminal windows, with pre-flight checks, coloured output, and auto-opens the browser at `http://localhost:5173`.
-
-**[CHORE]** Switched `SERP_PROVIDER` from `mock` to `serpapi` in `backend/.env` — real Google organic ranking data now active.
-
-
-**[FEAT]** Scaffolded full-stack project structure:
-- `backend/` — FastAPI Python server
-- `frontend/` — React 19 + Vite + TypeScript SPA
-
-**[FEAT]** Implemented backend core:
-- `database.py` — SQLAlchemy engine and session factory (SQLite dev / PostgreSQL prod)
-- `models.py` — `Job` and `KeywordTask` ORM models with `JobStatus` and `KeywordStatus` enums
-- `providers/base.py` — Abstract `SerpProvider` interface with `SearchResult` and `SearchResponse` Pydantic models
-- `providers/mock_provider.py` — Simulated SERP provider (no API key, realistic latency)
-- `providers/serpapi_provider.py` — Real SerpApi.com integration
-- `providers/__init__.py` — Factory function reading `SERP_PROVIDER` env var
-- `services/rank_tracker.py` — Domain normalization and `calculate_best_rank()` logic
-- `services/job_processor.py` — Async background job processor
-- `exports/generator.py` — CSV and Excel report generation via pandas + openpyxl
-- `api/routes.py` — REST endpoints: POST /api/rank-check, GET status, GET download
-- `main.py` — FastAPI app with CORS middleware
-
-**[FEAT]** Implemented frontend:
-- `App.tsx` — Single-page dashboard with form, progress bar, results table, download buttons
-
-**[DOCS]** Created comprehensive FAANG-grade `README.md` with system design diagrams, sequence diagrams, component diagrams, database schema, design decisions, API reference, and deployment guide.
-
-**[CHORE]** Created `.env.example` and `sample_keywords.csv`
-
----
-
-### Session 2 — Production Fixes & Git Setup
-
-**[FIX]** Created missing `requirements.txt` with pinned versions — previously `pip install -r requirements.txt` would fail
-
-**[FIX]** Added `__init__.py` to `api/`, `services/`, `exports/`, `tests/` — Python package imports were broken
-
-**[FIX]** `main.py` — Added `load_dotenv()` at startup so `.env` is actually read before any `os.getenv()` calls
-
-**[FIX]** `providers/base.py` — Added `title: str` field to `SearchResult` so page titles flow through the stack
-
-**[FIX]** `providers/serpapi_provider.py` — Completed country/language mapping: added Singapore, Germany, France, UAE, Brazil, Netherlands, Japan, Spain, Italy, Sweden, South Africa + 25 more countries. Added structured logging. Fixed UK code (`uk` → `gb`). Added `no_cache: true` param.
-
-**[FIX]** `providers/mock_provider.py` — Rewrote with realistic domain pool, configurable found/error/rate-limit rates, page title generation, structured logging
-
-**[FIX]** `models.py` — Added `page_title` column to `KeywordTask`
-
-**[FIX]** `services/rank_tracker.py` — `calculate_best_rank()` now returns 3-tuple `(rank, url, title)`. Added port-stripping to `normalize_domain()`. Added defensive sort.
-
-**[FIX]** `services/job_processor.py` — Updated to handle 3-tuple from `calculate_best_rank()`. Stores `page_title`. Replaced `print()` with structured `logging`. Added per-status error handling (rate_limited, timeout, api_error as distinct cases).
-
-**[FIX]** `exports/generator.py` — Added `Page Title` column to CSV/Excel output. Changed CSV encoding to `utf-8-sig` (Excel compatible). Added auto-fit column widths to Excel export.
-
-**[FIX]** `api/routes.py` — Added domain validation regex. Exposes `page_title` in GET response. Added `keyword_count` to job creation response. Descriptive download filenames include domain + date.
-
-**[FIX]** Frontend Tailwind v4 incompatibility — The project had Tailwind v4 installed but v3 config syntax. Fixed by:
-  - Installed `@tailwindcss/vite` plugin
-  - Updated `vite.config.ts` to use `@tailwindcss/vite` plugin
-  - Updated `src/index.css` to use `@import "tailwindcss"` (v4 syntax)
-  - Deleted obsolete `tailwind.config.js` and `postcss.config.js`
-
-**[FEAT]** `frontend/vite.config.ts` — Added `/api` proxy to FastAPI dev server (no more hardcoded localhost URLs)
-
-**[FEAT]** `App.tsx` — Major UI improvement:
-  - Color-coded rank badges (🟢 Top 10, 🔵 Top 30, 🟡 Top 100)
-  - Status badges with icons
-  - Stats bar showing Found / Not Found / Error counts
-  - Page Title column in results table
-  - New Check button to reset state
-  - Clickable ranking URLs
-
-**[TEST]** Rewrote `tests/test_domain_matching.py` — 18 tests covering:
-  - `normalize_domain` (https/http, www, paths, query params, ports, empty string)
-  - `match_domain` (exact, www, subdomain, deep subdomain, suffix attack prevention, partial TLD)
-  - `calculate_best_rank` (found, multiple appearances returns best, not found, empty results, returns title)
-
-**[CHORE]** Created root-level `.gitignore` covering Python venv, SQLite DBs, .env secrets, generated exports, node_modules
-
-**[CHORE]** Created `backend/.env` with safe defaults (SERP_PROVIDER=mock)
-
-**[CHORE]** Initialized Git repository with initial commit
-
----
-
-## How to Contribute to This Log
-
-When making changes, add an entry at the **top** of the relevant date section (or create a new date heading).
-Use the format:
-
-```
-**[TYPE]** `filename.py` or module — What changed and why.
-```
-
-Types: `FEAT` | `FIX` | `REFACTOR` | `DOCS` | `TEST` | `CHORE` | `PERF` | `SECURITY`
+**[FIX]** `frontend/src/index.css` — Moved Google Fonts `@import` above `@import "tailwindcss"`.
+**[FIX]** `backend/rank_tracker.db` — Auto-recreated on schema evolution.
+**[FEAT]** `start.ps1` [NEW] — Single PowerShell launcher for both servers with pre-flight checks.

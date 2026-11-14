@@ -1,34 +1,36 @@
 import os
 import logging
+from typing import Optional
 from providers.base import SerpProvider
 from providers.serpapi_provider import SerpApiProvider
 from providers.mock_provider import MockProvider
+from providers.free_serp_provider import FreeSerpProvider
 
 logger = logging.getLogger(__name__)
 
 
-def get_provider() -> SerpProvider:
+def get_provider(provider_name: Optional[str] = None) -> SerpProvider:
     """
-    Factory function that reads SERP_PROVIDER from the environment
-    and returns the appropriate provider instance.
+    Factory function returning the selected SERP provider instance.
 
-    Supported values:
-        mock     — local simulation, no API key needed (default)
-        serpapi  — real Google results via serpapi.com
+    Supported engines:
+        mock     — Zero-cost deterministic simulation with cannibalization & competitor modeling
+        free     — Zero-cost live search engine (DuckDuckGo Lite / SearXNG with smart fallback)
+        serpapi  — Real Google SERP results via SerpApi.com (requires SERP_API_KEY)
     """
-    provider_name = os.getenv("SERP_PROVIDER", "mock").lower().strip()
+    name = (provider_name or os.getenv("SERP_PROVIDER", "mock")).lower().strip()
 
-    if provider_name == "serpapi":
-        logger.info("Using SerpApiProvider (real Google results)")
+    if name == "serpapi":
+        logger.info("Engaging SerpApiProvider (real Google results)")
         return SerpApiProvider()
 
-    if provider_name == "mock":
-        logger.info("Using MockProvider (simulated results)")
+    if name in ("free", "duckduckgo", "searxng"):
+        logger.info("Engaging FreeSerpProvider (zero-cost live search)")
+        return FreeSerpProvider()
+
+    if name == "mock":
+        logger.info("Engaging MockProvider (smart deterministic simulation)")
         return MockProvider()
 
-    logger.warning(
-        "Unknown SERP_PROVIDER=%r — falling back to MockProvider. "
-        "Valid options: 'mock', 'serpapi'.",
-        provider_name,
-    )
+    logger.warning("Unknown provider %r — falling back to MockProvider.", name)
     return MockProvider()

@@ -7,6 +7,7 @@ class SearchResult(BaseModel):
     rank: int
     url: str
     title: str = ""  # Page title from SERP result
+    domain: str = ""  # Root or parsed domain for competitor analysis
 
 
 class SearchResponse(BaseModel):
@@ -25,16 +26,18 @@ class SerpProvider(ABC):
         language: str,
         device: str,
         depth: int = 100,
+        target_domain: Optional[str] = None,
     ) -> SearchResponse:
         """
         Search for a keyword and return organic results.
 
         Args:
-            keyword:  The search query string.
-            country:  Human-readable country name (e.g. "India").
-            language: Human-readable language name (e.g. "English").
-            device:   "desktop" or "mobile".
-            depth:    Maximum number of organic results to retrieve.
+            keyword:       The search query string.
+            country:       Human-readable country name (e.g. "India").
+            language:      Human-readable language name (e.g. "English").
+            device:        "desktop" or "mobile".
+            depth:         Maximum number of organic results to retrieve.
+            target_domain: Optional domain being tracked (e.g. "github.com") for realistic mock simulations.
 
         Returns:
             SearchResponse with a ranked list of organic results.

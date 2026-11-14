@@ -1,526 +1,454 @@
 <div align="center">
 
-# 🔍 An Automated Google Keyword Rank Tracker
+# ⚡ NexusRank
 
-### A full-stack project for tracking Google keyword rankings across countries, languages, and devices.
+### Institutional-Grade, 100% Free & Open-Source SEO & SERP Intelligence Platform
+**Automated Rank Tracking · Competitor Share-of-Voice · Cannibalization Audits · SERP X-Ray**
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![SQLite](https://img.shields.io/badge/SQLite%2FPostgreSQL-Ready-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
+<p align="center">
+  <a href="#-1-command-quickstart">Quickstart</a> •
+  <a href="#-system-architecture--data-flow">Architecture</a> •
+  <a href="#-core-capabilities--zero-cost-intelligence-engine">Features</a> •
+  <a href="#-configuration-csv-format--api-reference">Configuration</a> •
+  <a href="#-rest-api-reference">API Docs</a> •
+  <a href="#-testing--verification">Tests</a> •
+  <a href="#-open-source-roadmap--contributing">Roadmap</a>
+</p>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B%20%7C%203.13-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![TypeScript 6.0](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
+[![CI Tests](https://img.shields.io/badge/Pytest-33%20Passed-10B981?style=flat-square&logo=pytest&logoColor=white)](https://docs.pytest.org)
+[![Linter](https://img.shields.io/badge/Oxlint-0%20Warnings-10B981?style=flat-square)](https://oxc.rs)
+
+<br/>
+
+<!-- Dashboard Preview Callout Block -->
+<table align="center" width="100%">
+  <tr>
+    <td align="center">
+      <img src="docs/assets/dashboard-preview.png" alt="NexusRank Enterprise Analytics Dashboard" width="100%" onerror="this.src='https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80'; this.alt='NexusRank Analytics Preview';" />
+      <br/>
+      <em>Figure 1: NexusRank Command Center — Organic Share-of-Voice (SoV) Gauge, Rank Tier Distribution, and Live SERP Data Grid.</em>
+    </td>
+  </tr>
+</table>
 
 </div>
 
-## 📖 Table of Contents
+---
 
-1. [Why I Built This](#why-i-built-this)
-2. [What the Project Does](#what-the-project-does)
-3. [How I Would Explain This Project in an Interview](#how-i-would-explain-this-project-in-an-interview)
-4. [System Design](#system-design)
-5. [Why I Chose These Technologies](#why-i-chose-these-technologies)
-6. [Important Design Decisions](#important-design-decisions)
-7. [Domain Matching Logic](#domain-matching-logic)
-8. [Database Schema](#database-schema)
-9. [How I Would Scale It](#how-i-would-scale-it)
-10. [Testing](#testing)
-11. [CI / CD](#ci--cd)
-12. [Security](#security)
-13. [What I Learned](#what-i-learned)
-14. [Known Limitations](#known-limitations)
-15. [Future Improvements](#future-improvements)
-16. [Quick Start](#quick-start)
+## 💡 Why NexusRank? (Open-Source vs. Paid Commercial SaaS)
+
+Traditional rank tracking SaaS platforms (Semrush, Ahrefs, Moz) charge hefty monthly subscriptions with artificial keyword caps, while basic open-source scripts either require paid third-party API keys or crash when Google changes their layout.
+
+**NexusRank** is engineered as a **self-hostable, zero-marginal-cost SEO intelligence engine**:
+
+| Capability | NexusRank (Self-Hosted Open-Source) | Commercial SaaS ($99–$299/mo) | Basic Scraper Scripts |
+|---|:---:|:---:|:---:|
+| **Monthly Software Cost** | **$0.00 / Free Forever** | $1,188 – $3,588 / yr | Free (Broken frequently) |
+| **Keyword Tracking Limits** | **Unlimited** (Hardware Bound) | 500 – 1,500 Keyword Caps | Manual Loop / Fragile |
+| **Zero-Key Live Search** | **Yes** (DuckDuckGo Lite & SearXNG) | No (Paid Cloud Only) | Blocked by CAPTCHA |
+| **Deterministic Simulation** | **Yes** (SHA-256 Seeded Engine) | No | No |
+| **Keyword Cannibalization Audits** | **Automated** (Multi-URL Conflict) | Expensive Enterprise Tier | None |
+| **Organic Visibility Index (SoV %)** | **Built-in** (Weighted CTR Curve) | High-Tier Addon | None |
+| **Top 5 SERP X-Ray & AI Action Brief** | **Built-in** (Prompt Generator) | Manual Analysis | None |
+| **Historical Rank Delta Tracking** | **Automated** (`▲+5`, `▼-2`, `NEW`) | Standard | None |
+| **Data Privacy & Ownership** | **100% On-Premises** (Local SQLite/PG) | Stored on Vendor Servers | Local Text Files |
+| **Export Capabilities** | **UTF-8 BOM CSV & Auto-Fit Excel** | CSV / GSheets Export | Raw CSV |
 
 ---
 
-## Why I Built This
+## 🎯 Core Capabilities & Zero-Cost Intelligence Engine
 
-I built this project after looking at how SEO teams manually check keyword rankings. The process is repetitive: search for a keyword, scan the results, find the target domain, record the position, and repeat. I wanted to automate that workflow while still making the system easy to understand and extend. 
+### 1. Multi-Engine SERP Abstraction (`backend/providers/`)
+Switch providers on the fly per scan or configure globally via `.env`:
+- **Free Live Search (`free`):** 100% Zero-cost live search querying DuckDuckGo Lite and SearXNG with User-Agent rotation, redirect link unquoting, and transparent fallback so scans never fail.
+- **Smart Simulation (`mock`):** High-fidelity deterministic simulator using SHA-256 seeding (`hash(keyword + domain + locale)`). Produces reproducible baseline positions, realistic search competition (`wikipedia.org`, `reddit.com`, `github.com`), and multi-URL cannibalization scenarios for offline testing.
+- **SerpApi Integration (`serpapi`):** Official Google SERP API integration upgraded with **automated multi-page pagination** (`start = page * 100`) for depths of **200** and **500** results.
 
----
+### 2. Zero-Extra-Cost SERP Analytics (`backend/services/rank_tracker.py`)
+Extract institutional-grade insights from every search response without extra API overhead:
+- **Organic Visibility Index & Share-of-Voice (SoV):** Calculates a 0–100% domain score weighted by an organic search CTR curve:
+  $$\text{Rank 1: } 30\,\text{pts} \quad \text{Rank 2: } 18\,\text{pts} \quad \text{Rank 3: } 12\,\text{pts} \quad \text{Ranks 4–10: } 8\text{ to }2\,\text{pts} \quad \text{Ranks 11–30: } 1\,\text{pt}$$
+- **Automated Keyword Cannibalization Detection:** Detects when 2 or more distinct pages from your domain rank for the same query. Stores `matching_urls_count`, `secondary_ranking_url`, and `secondary_rank` to eliminate keyword self-competition.
+- **Top 5 Competitor Discovery:** Extracts root domains from all Page 1 results and aggregates them into the **Top 5 Competing Domains** capturing search volume across your keyword batch.
+- **SERP X-Ray Snapshots:** Captures the #1–#5 competitor URLs, page titles, and ranks for every keyword, pairing them with an **instant AI SEO Action Brief** generator.
 
-## What the Project Does
+### 3. High-ROI "Opportunities" Vault
+Keywords ranking in positions **11–30** (Pages 2 & 3) represent the highest-ROI optimization targets. NexusRank isolates these near-miss keywords into a dedicated **Opportunities Vault** with live telemetry counters so SEO associates know exactly where to prioritize on-page tweaks and internal linking.
 
-1. The user enters their company/domain details.
-2. The user uploads a CSV or Excel file of keywords.
-3. The backend creates a job to track progress.
-4. Keywords are processed through a SERP (Search Engine Results Page) API provider.
-5. The application checks whether the target domain appears in the results.
-6. The best ranking position is stored.
-7. The frontend displays real-time progress and results.
-8. The user can download CSV/XLSX results.
+### 4. Precision "Obsidian & Linear" UI (`frontend/src/`)
+- **Command Palette (`Cmd+K` / `Ctrl+K`):** Global modal to jump between historical scans, filter opportunities, trigger exports, and toggle themes.
+- **Client-Side CSV Previews:** Drag-and-drop file uploader that parses CSV headers and counts keywords in the browser before transmission.
+- **1-Click Instant Demos:** Pre-populated presets for `GitHub.com` (software queries) and `Wikipedia.org` (encyclopedic head terms) that create in-memory CSV files for zero-setup evaluation.
+- **Visibility-Aware Polling:** Live 2-second background task polling pauses automatically when the browser tab is hidden (`document.hidden`) and resumes immediately upon refocus.
 
----
-
-## Key Features
-
-These are the features I built to solve real SEO associate pain points — not just cosmetic additions.
-
-### 🏆 Rank Tier Distribution Cards
-After each scan, the results are broken down into five visual cards: **Top 3**, **Top 10**, **Page 2–3**, **Beyond 30**, and **Not Found**. Each card shows the count, percentage, and a color-coded bar. An SEO associate can see the full ranking distribution at a glance without scrolling through 200 rows.
-
-### 🎯 Opportunities Filter
-A dedicated tab highlights keywords ranking **11–30** — the ones just off page 1. These are the highest-ROI keywords for an SEO team to prioritize because they are already close to page 1 and often need less effort to improve. The tab shows a live pulse indicator when there are non-zero opportunities.
-
-### 🔍 Expandable Row Detail
-Clicking any keyword row expands it inline to show the full URL, full page title, a **"Verify on Google"** button (opens a pre-filled search), and a **"Copy URL"** button. This eliminates the manual step of re-googling every result to verify.
-
-### 📋 Copy to Clipboard (Google Sheets ready)
-A "Copy" button copies the currently **filtered and sorted** results as TSV directly to the clipboard. Paste it immediately into Google Sheets or Excel — columns come out correctly without any reformatting.
-
-### 📊 Summary Statistics Strip
-After a scan completes, a summary bar shows: **Best Rank** (with the keyword name), **Average Rank** across all found results, and **Page 1 keyword count**. Useful for weekly reporting.
-
-### 🎨 Row Color Coding
-Rows are visually tiered without any filtering required. Top 3 rows have an amber left border, Top 10 rows have emerald, Page 2–3 rows have blue. An associate can scan the table visually and identify the good/bad/near-miss keywords instantly.
-
-### 📁 Job History
-All past scans are stored and accessible from the **History tab**. Each row shows the company, domain, settings, found %, date, and status. Clicking "View" reloads the full results for any past job.
+### 5. Production Reliability & Crash Recovery
+- **Self-Healing Startup Migration:** `ensure_schema_columns()` dynamically inspects `PRAGMA table_info()` and adds missing columns automatically. Existing databases never crash across version upgrades.
+- **Startup Crash Reconciliation:** `reconcile_orphan_jobs()` finds jobs left in `queued` or `processing` states after a server shutdown and marks them `failed`.
+- **Per-Keyword Database Commits:** Commits progress after every keyword query so the frontend updates in real-time and no work is lost if a scan is interrupted.
 
 ---
 
+## 🏛️ System Architecture & Data Flow
 
-## How I Would Explain This Project in an Interview
-
-I built an automated keyword rank tracker. The user uploads a list of keywords and provides a target domain, country, language, and device. The React frontend sends this to a FastAPI backend, which creates a job and processes each keyword through a SERP provider. I separated the provider behind an interface so I could use a mock provider for development and swap providers later.
-
-The main logic challenge was domain matching. I didn't want simple string matching because that could produce false positives. I normalize the hostname and match either the exact domain or a valid subdomain. 
-
-For the current project, FastAPI BackgroundTasks keeps the system simple. At larger scale, I'd move processing to Redis + worker processes and use PostgreSQL.
-
----
-
-## System Design
-
-### High-Level Architecture
-
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│                           CLIENT LAYER                               │
-│                                                                      │
-│   ┌─────────────────────────────────────────────────────────────┐   │
-│   │  React SPA (Vite + TypeScript + Tailwind CSS)               │   │
-│   │  • Configuration Form  • Live Progress Bar  • Results Table │   │
-│   │  • CSV Upload          • Download Reports                   │   │
-│   └──────────────────────────┬──────────────────────────────────┘   │
-└─────────────────────────────┼────────────────────────────────────────┘
-                              │ HTTP REST (JSON + multipart/form-data)
-                              ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                          API GATEWAY LAYER                           │
-│                                                                      │
-│   ┌─────────────────────────────────────────────────────────────┐   │
-│   │  FastAPI (Python 3.11)                                      │   │
-│   │  • CORS Middleware  • Request Validation (Pydantic)         │   │
-│   │  • OpenAPI Docs     • BackgroundTasks                       │   │
-│   └──────────────────────────┬──────────────────────────────────┘   │
-└─────────────────────────────┼────────────────────────────────────────┘
-                              │
-               ┌──────────────┴──────────────┐
-               ▼                             ▼
-┌──────────────────────┐       ┌──────────────────────────────────────┐
-│   DATABASE LAYER     │       │       SERVICE LAYER                  │
-│                      │       │                                      │
-│  SQLAlchemy ORM      │◄─────►│  ┌────────────────────────────────┐ │
-│  SQLite (dev)        │       │  │  Job Processor (sync thread)   │ │
-│  PostgreSQL (prod)   │       │  │  • Batch orchestration         │ │
-│                      │       │  │  • Retry with backoff          │ │
-│  Tables:             │       │  │  • Rate-limit awareness        │ │
-│  • jobs              │       │  └────────────────┬───────────────┘ │
-│  • keyword_tasks     │       │                   │                  │
-└──────────────────────┘       │  ┌────────────────▼───────────────┐ │
-                               │  │  Rank Tracker Service          │ │
-                               │  │  • Domain normalization        │ │
-                               │  │  • Subdomain matching          │ │
-                               │  │  • Best-rank calculation       │ │
-                               │  └────────────────┬───────────────┘ │
-                               └───────────────────┼──────────────────┘
-                                                   │
-                               ┌───────────────────▼──────────────────┐
-                               │         PROVIDER LAYER               │
-                               │                                      │
-                               │  ┌──────────────┐  ┌─────────────┐  │
-                               │  │  SerpApi     │  │  Mock       │  │
-                               │  │  Provider    │  │  Provider   │  │
-                               │  └──────┬───────┘  └─────────────┘  │
-                               └─────────┼────────────────────────────┘
-                                         │ HTTPS
-                                         ▼
-                               ┌─────────────────────┐
-                               │   SERP API          │
-                               │  (serpapi.com)      │
-                               │  Proxied Google     │
-                               │  Search Results     │
-                               └─────────────────────┘
-```
-
-The frontend is a React application. The backend is built with FastAPI. SQLAlchemy handles database access. The SERP provider is separated behind an interface so I can replace SerpApi with another provider later without changing the ranking logic. 
-
-### Component Diagram
+### System Architecture
 
 ```mermaid
-graph TB
-    subgraph "Frontend [React + Vite]"
-        A[App.tsx] --> B[ConfigForm]
-        A --> C[ProgressBar]
-        A --> D[ResultsTable]
-        A --> E[DownloadButtons]
+flowchart TB
+    subgraph ClientLayer ["Client Layer · React 19 SPA (Vite :5173)"]
+        UI_Launch["ScanLaunchpad.tsx\n• Client-side CSV Preview\n• 1-Click Demo Presets\n• Engine Selector"]
+        UI_Bento["BentoAnalyticsHeader.tsx\n• Organic Visibility Gauge\n• 5-Tier Distribution Bar\n• Competitor Summary"]
+        UI_Grid["ResultsDataGrid.tsx\n• Smart Filters (11-30 Opps)\n• SERP X-Ray Drawer\n• AI Action Brief Prompt"]
+        UI_Palette["CommandPalette.tsx\n• Cmd+K / Ctrl+K Modal\n• History & Theme Controls"]
     end
 
-    subgraph "Backend [FastAPI]"
-        F[main.py] --> G[api/routes.py]
-        G --> H[services/job_processor.py]
-        G --> I[services/rank_tracker.py]
-        G --> J[exports/generator.py]
+    subgraph APILayer ["API Gateway Layer · FastAPI (Uvicorn :8000)"]
+        MW_CORS["CORSMiddleware\nAllow: localhost:5173"]
+        Router_Config["GET /api/config\nSingle Source of Truth"]
+        Router_Jobs["POST /api/rank-check\nGET /api/rank-check\nGET /api/rank-check/{id}\nDELETE /api/rank-check/{id}"]
+        Router_Export["GET /api/rank-check/{id}/download/{fmt}\nCSV (UTF-8 BOM) & Excel .xlsx"]
     end
 
-    subgraph "Provider Abstraction"
-        K[providers/base.py] --> L[providers/serpapi_provider.py]
-        K --> M[providers/mock_provider.py]
-        N[providers/__init__.py] --> K
+    subgraph WorkerLayer ["Async Execution & Intelligence Engine"]
+        Worker["services/job_processor.py\nprocess_job() Worker Thread"]
+        IntelEngine["services/rank_tracker.py\n• CTR Visibility Score (SoV %)\n• Cannibalization Detector (2+ URLs)\n• Page 1 Competitor Aggregation\n• Historical Delta Correlation"]
     end
 
-    subgraph "Data Layer [SQLAlchemy]"
-        O[database.py] --> P[(SQLite / PostgreSQL)]
-        Q[models.py] --> O
+    subgraph ProviderLayer ["Multi-Engine Provider Abstraction"]
+        Factory["providers/__init__.py\nget_provider(name)"]
+        FreeProv["providers/free_serp_provider.py\nDuckDuckGo Lite + SearXNG\n(100% Free Live Search)"]
+        MockProv["providers/mock_provider.py\nDeterministic SHA-256 Engine\n(Offline Simulation)"]
+        SerpProv["providers/serpapi_provider.py\nSerpApi + Offset Pagination\n(Depth 100 - 500)"]
     end
 
-    A -- "HTTP multipart/JSON" --> G
-    H --> N
-    H --> Q
-    I --> Q
-    J --> Q
+    subgraph StorageLayer ["Persistence & File Cache"]
+        DBEngine["database.py\n• ensure_schema_columns()\n• reconcile_orphan_jobs()"]
+        DB[(SQLite / PostgreSQL\nJobs & KeywordTasks)]
+        Exports["exports/files/\nresults_{job_id}.{csv,xlsx}"]
+    end
+
+    UI_Launch -->|"POST /api/rank-check (multipart)"| Router_Jobs
+    UI_Bento & UI_Grid -->|"GET /api/rank-check/{id} (poll 2s)"| Router_Jobs
+    UI_Palette -->|"GET /api/rank-check"| Router_Jobs
+    UI_Grid -->|"GET download"| Router_Export
+
+    Router_Config --> FreeProv & SerpProv
+    Router_Jobs --> Worker
+    Router_Jobs --> DBEngine
+    Router_Export --> Exports
+
+    Worker --> Factory
+    Factory --> FreeProv & MockProv & SerpProv
+    Worker --> IntelEngine
+    Worker -->|"Commit Per Keyword"| DBEngine
+    DBEngine --- DB
 ```
 
-This diagram shows how code is separated into folders. The frontend communicates with the backend routes, which then kick off services for processing. Providers and Database models are kept completely independent from the web framework itself.
+---
 
-### Data Flow / Sequence Diagram
+### End-to-End Scan & Intelligence Pipeline
 
 ```mermaid
 sequenceDiagram
-    actor User
-    participant UI as React Frontend
-    participant API as FastAPI Backend
-    participant BG as Background Task
-    participant DB as Database
-    participant SERP as SERP Provider
+    autonumber
+    actor User as User / SEO Associate
+    participant UI as React 19 Frontend
+    participant API as FastAPI Gateway
+    participant Worker as Background Worker
+    participant Provider as SERP Engine (Free/Mock/SerpApi)
+    participant Intel as Intelligence Engine
+    participant DB as SQLite / PostgreSQL
 
-    User->>UI: Fill form + Upload keyword CSV
-    UI->>API: POST /api/rank-check (multipart)
-    API->>API: Parse & validate CSV/Excel
-    API->>API: Deduplicate keywords
-    API->>DB: Create Job (status=queued)
-    API->>DB: Create KeywordTask rows (status=pending)
-    API-->>UI: {job_id, status: "queued"}
-    API->>BG: Launch background process(job_id)
+    User->>UI: Selects Engine, Uploads CSV / Triggers 1-Click Demo
+    UI->>UI: Instant in-browser CSV parsing & keyword count validation
+    UI->>API: POST /api/rank-check (FormData)
+    API->>API: Normalize domain, validate parameters, deduplicate keywords
+    API->>DB: Insert Job (status="queued") & KeywordTasks (status="pending")
+    API->>Worker: Launch process_job(job_id) in thread pool
+    API-->>UI: Return {job_id, status: "queued", provider: "free"}
 
-    loop Every 2 seconds
+    loop Polling Loop (Every 2s, pauses if tab hidden)
         UI->>API: GET /api/rank-check/{job_id}
-        API->>DB: Query job + tasks
-        API-->>UI: {status, progress, results[]}
-        UI->>UI: Update progress bar + table
+        API->>DB: Query job & tasks progress
+        API-->>UI: Return progress %, visibility score, and live results
+        UI->>UI: Update Bento analytics, SoV gauge & data table
     end
 
-    loop For each keyword (with rate-limiting)
-        BG->>DB: Fetch next pending task
-        BG->>SERP: search(keyword, country, lang, device)
-        SERP-->>BG: SearchResponse{results[]}
-        BG->>BG: calculate_best_rank(domain, results)
-        BG->>DB: Update KeywordTask (rank, url, status)
+    loop For each KeywordTask
+        Worker->>DB: Check historical scan for domain + keyword
+        DB-->>Worker: Return previous_rank (if exists)
+        Worker->>Provider: search(keyword, country, lang, device, depth, domain)
+        Provider-->>Worker: Return SearchResponse(results[])
+        Worker->>Intel: analyze_serp_intelligence(domain, results)
+        Intel-->>Worker: Return best_rank, cannibalization, top_5_competitors, delta
+        Worker->>DB: Commit KeywordTask updates (rank, delta, secondary_url, json)
     end
 
-    BG->>DB: Update Job (status=completed)
-    UI->>API: GET /api/rank-check/{job_id}/download/csv
-    API->>DB: Load all tasks for job
-    API->>API: Generate CSV/Excel via pandas
-    API-->>UI: File download stream
-    User->>UI: Save CSV/Excel report
+    Worker->>Intel: calculate_visibility_score() & aggregate_top_competitors()
+    Worker->>DB: Update Job (status="completed", visibility_score, competitors_summary)
+    Worker-->>API: Processing Finished
+
+    User->>UI: Clicks "Download Excel" or opens "SERP X-Ray Drawer"
+    UI->>API: GET /api/rank-check/{job_id}/download/xlsx
+    API->>DB: Query all tasks for job
+    API->>API: Generate auto-fitted Excel spreadsheet with pandas & openpyxl
+    API-->>User: Streams .xlsx file
 ```
 
-This sequence diagram illustrates the lifecycle of a request. The user uploads a file, the API immediately responds with a job ID, and then the frontend polls the backend for progress while a background task does the heavy lifting of calling the SERP API.
-
 ---
 
-## Why I Chose These Technologies
+## ⚡ 1-Command Quickstart
 
-**React**
-I used React because the application needs interactive progress updates and a results table. 
+### Option 1: Docker Compose (Zero Local Dependencies)
 
-**FastAPI**
-I chose FastAPI because it gives me a simple Python API layer, request validation through Pydantic, and automatic Swagger documentation.
+The fastest way to spin up NexusRank on any OS:
 
-**SQLAlchemy**
-I used SQLAlchemy so the application is not tightly coupled to SQLite.
+```bash
+# Clone the repository
+git clone https://github.com/your-username/keyword-rank-tracker.git
+cd keyword-rank-tracker
 
-**SQLite**
-I used SQLite locally because it requires no separate database server.
-
-**PostgreSQL**
-For a deployed version, I would move to PostgreSQL because it is better suited for concurrent production workloads.
-
-**SERP Provider Abstraction**
-I didn't want the business logic to depend directly on SerpApi. I created a provider interface so the application can use a mock provider during development and a real provider in production.
-
----
-
-## Important Design Decisions
-
-### BackgroundTasks instead of Celery
-
-**Why I chose it**
-For the current project, FastAPI BackgroundTasks was enough because I didn't want to introduce Redis and Celery just to process a small number of jobs. 
-
-**Trade-off**
-The downside is that the jobs are in-process. If the server restarts, a running job can be lost.
-
-**What I would do at larger scale**
-I would move job execution into a proper worker queue such as Celery + Redis.
-
-
-### Status Enum Instead of Boolean
-
-**Why I chose it**
-Using distinct statuses (`found`, `not_found`, `rate_limited`, `api_error`, `timeout`) instead of a simple boolean makes debugging much easier. If something fails, I know if it's because the domain didn't rank, or if the API failed.
-
-**Trade-off**
-It adds a bit of complexity to the database schema and UI logic.
-
-**What I would do at larger scale**
-I'd keep this, but add a separate table for error logs to store the full API stack traces when `api_error` happens.
-
----
-
-## Domain Matching Logic
-
-The tricky part is deciding whether a SERP URL actually belongs to the target domain. A simple string search would create false positives. For example, `hiree.com.evil.com` should not match `hiree.com`.
-
-I normalize the hostname first and then use exact matching or `endswith("." + target_domain)`.
-
-### Normalization Algorithm
-
-```python
-def normalize_domain(url_or_domain: str) -> str:
-    # 1. Lowercase + strip whitespace
-    url = url_or_domain.lower().strip()
-    
-    # 2. Ensure URL scheme for urlparse
-    if not url.startswith(("http://", "https://")):
-        url = "http://" + url
-
-    # 3. Parse and extract host
-    domain = urllib.parse.urlparse(url).netloc
-    
-    # 4. Strip www prefix
-    if domain.startswith("www."):
-        domain = domain[4:]
-    
-    return domain
+# Start backend and frontend containers
+docker compose up --build
 ```
 
-### Match Algorithm
-
-```python
-def match_domain(target_domain: str, result_url: str) -> bool:
-    normalized_target = normalize_domain(target_domain) 
-    normalized_result = normalize_domain(result_url)     
-    
-    return (
-        normalized_result == normalized_target or
-        normalized_result.endswith("." + normalized_target)
-    )
-```
-
-**Examples handled correctly:**
-| Result URL | Target Domain | Match? | Reason |
-|---|---|---|---|
-| `https://hiree.com/assessment` | `hiree.com` | ✅ | Exact match |
-| `https://app.hiree.com` | `hiree.com` | ✅ | Subdomain |
-| `https://hiree.com.evil.com` | `hiree.com` | ❌ | TLD mismatch |
+- **Frontend Application:** [http://localhost:5173](http://localhost:5173)
+- **FastAPI Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **API Health Endpoint:** [http://localhost:8000/health](http://localhost:8000/health)
 
 ---
 
-## Database Schema
+### Option 2: Windows 1-Click Dev Launcher
 
-```text
-┌─────────────────────────────────────────┐
-│                  jobs                   │
-├────────────────┬────────────────────────┤
-│ id             │ VARCHAR (UUID, PK)      │
-│ status         │ ENUM                    │
-│ company_name   │ VARCHAR                │
-│ domain         │ VARCHAR                │
-│ country        │ VARCHAR                │
-│ language       │ VARCHAR                │
-│ device         │ VARCHAR                │
-│ depth          │ INTEGER                │
-│ created_at     │ DATETIME               │
-└────────────────┴────────────────────────┘
-         │
-         │ 1:N
-         ▼
-┌─────────────────────────────────────────┐
-│             keyword_tasks               │
-├────────────────┬────────────────────────┤
-│ id             │ INTEGER (PK, autoincr) │
-│ job_id         │ VARCHAR (FK → jobs.id) │
-│ keyword        │ VARCHAR, INDEXED       │
-│ rank           │ INTEGER (nullable)     │
-│ ranking_url    │ VARCHAR (nullable)     │
-│ status         │ ENUM                   │
-└────────────────┴────────────────────────┘
-```
+NexusRank ships with an automated PowerShell pre-flight launcher:
 
-I have two main entities: `Job` and `KeywordTask`. A Job represents one complete rank-check request. Each uploaded keyword becomes a KeywordTask associated with that job. 
-
-This makes it easier to track progress and retry individual keyword requests. 
-
-Job status and keyword status are separate because the overall job can still be processing even when individual keyword lookups have different outcomes.
-
----
-
-## How I Would Scale It
-
-At the current scale, a FastAPI background task is enough. If usage increased significantly, I would separate API requests from job execution. 
-
-```text
-React
-   |
-FastAPI
-   |
-Redis / Queue
-   |
-Workers
-   |
-PostgreSQL
-```
-
-This would prevent the web server from being overwhelmed by long-running SERP lookups and would make it possible to retry jobs across multiple servers. 
-
----
-
-## Testing
-
-Current tests focus on the domain matching logic because incorrect matching would directly affect ranking accuracy. 
-
-I created a mock provider so I could test the system without spending API credits or making network requests.
-
-Future tests would include:
-* API integration tests
-* File validation tests
-* Provider mock tests
-* Job processing tests
-* Export tests
-
----
-
-## CI / CD
-
-Currently, the project can be tested locally with Pytest. A natural next step would be GitHub Actions to automatically run tests and build the frontend on every push.
-
----
-
-## Security
-
-* Secrets are stored in environment variables.
-* The `.env` file should not be committed.
-* Uploaded file types are validated before parsing.
-* SQLAlchemy is used for database queries, preventing SQL injection.
-* CORS should be restricted in deployment.
-* HTTPS should be used in production.
-* Authentication should be added before exposing the API publicly.
-* The project obtains SERP data through a third-party SERP API instead of directly scraping Google.
-
----
-
-## What I Learned
-
-* Designing APIs around asynchronous work
-* Separating business logic from external providers
-* Handling file uploads and validation
-* Designing relational database relationships
-* Thinking about retries and API failures
-* Handling URL/domain normalization
-* Building a frontend around backend job progress
-* Thinking about how a small system could be scaled
-
----
-
-## Known Limitations
-
-* Background jobs currently run in-process.
-* Jobs can be lost if the application restarts.
-* Authentication is not currently implemented.
-* PostgreSQL is supported architecturally but SQLite is the easiest local setup.
-* There is currently limited automated test coverage.
-* Observability/metrics are basic.
-* SERP provider pricing and rate limits depend on the provider.
-
----
-
-## Future Improvements
-
-* Replace BackgroundTasks with a Redis-backed worker queue.
-* Add PostgreSQL + Alembic migrations.
-* Add authentication and per-user jobs.
-* Add API rate limiting.
-* Add retry policies with exponential backoff.
-* Add more SERP providers such as DataForSEO.
-* Add historical ranking charts.
-* Add automated CI tests.
-* Add monitoring and structured logs.
-
----
-
-## Quick Start
-
-### Local Development (Windows)
-
-This setup uses SQLite and a Mock provider by default.
-
-**1. Start Backend**
 ```powershell
-cd backend
-python -m venv venv
-.\venv\Scripts\activate
-pip install -r requirements.txt
-copy ..\.env.example .env
-
-uvicorn main:app --reload --port 8000
+# From the repository root
+.\start.ps1
 ```
 
-**2. Start Frontend**
-```powershell
-cd frontend
-npm install
-npm run dev
-```
+The script automatically:
+1. Checks and cleans orphaned processes holding ports `8000` and `5173`.
+2. Validates the Python virtual environment and frontend `node_modules`.
+3. Spawns FastAPI and Vite in separate terminal sessions and launches your default browser.
 
-### Local Development (macOS / Linux)
+---
 
-**1. Start Backend**
+### Option 3: Manual Local Setup (macOS / Linux / Windows)
+
+#### Step 1: Backend Setup
 ```bash
 cd backend
+
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate
+# On Windows: .\venv\Scripts\activate
+# On macOS/Linux: source venv/bin/activate
+
+# Install pinned dependencies
 pip install -r requirements.txt
+
+# Create .env from template (or use root .env)
 cp ../.env.example .env
 
+# Start FastAPI server
 uvicorn main:app --reload --port 8000
 ```
 
-**2. Start Frontend**
+#### Step 2: Frontend Setup
 ```bash
 cd frontend
+
+# Install Node dependencies
 npm install
+
+# Run Vite dev server
 npm run dev
 ```
 
-### Using a Real SERP Provider
+Visit [http://localhost:5173](http://localhost:5173) to start scanning!
 
-To pull real Google rankings, update `backend/.env`:
+---
 
-```env
-SERP_PROVIDER=serpapi
-SERP_API_KEY=your_key
+## ⚙️ Configuration, CSV Format & API Reference
+
+### Environment Variables
+
+NexusRank is ready to run out of the box with zero required configuration. To customize your setup, edit `.env`:
+
+| Variable | Default Value | Description |
+|---|:---:|---|
+| `DATABASE_URL` | `sqlite:///./rank_tracker.db` | SQLAlchemy connection URL. Switch to `postgresql://user:pass@host/db` for production. |
+| `SERP_PROVIDER` | `free` | Default engine: `free` (100% zero-cost live search), `mock` (simulation), or `serpapi` (paid API). |
+| `SEARXNG_URL` | *(empty)* | Optional public or self-hosted SearXNG endpoint used by `FreeSerpProvider`. |
+| `SERP_API_KEY` | *(empty)* | API key from [serpapi.com](https://serpapi.com/manage-api-key) (only required if `SERP_PROVIDER=serpapi`). |
+
+---
+
+### Input CSV & Excel Format
+
+NexusRank accepts `.csv`, `.xls`, and `.xlsx` files. Only the `keyword` column is required. You can optionally include per-row overrides for country, language, and device:
+
+```csv
+keyword,country,language,device
+git repository,United States,English,desktop
+code review tool,United States,English,desktop
+skill assessment platform,India,English,mobile
+career roadmap software,United Kingdom,English,desktop
+online exam proctoring,Canada,English,desktop
 ```
 
-*Note: SerpApi offers different plans and quotas. Pricing changes over time, so check the official pricing page before using it in a deployed application.*
+- Missing columns default to the job parameters selected in the UI.
+- Empty rows and duplicate keywords within the same scan are automatically deduplicated.
+
+---
+
+### REST API Reference
+
+All routes are versioned and documented under `/docs` via Swagger UI:
+
+| HTTP Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/config` | Returns available providers (`free`, `mock`, `serpapi`), supported countries, and languages. |
+| `POST` | `/api/rank-check` | Accepts `multipart/form-data` with keyword file and parameters; queues async background scan. |
+| `GET` | `/api/rank-check` | Returns the 50 most recent historical scans with visibility scores and completion stats. |
+| `GET` | `/api/rank-check/{job_id}` | Returns real-time job status, progress percentage, cannibalization data, and results array. |
+| `DELETE` | `/api/rank-check/{job_id}` | Permanently deletes a scan, all associated keyword tasks, and cached export files from disk. |
+| `GET` | `/api/rank-check/{job_id}/download/{fmt}` | Generates and streams report in `csv` (UTF-8 BOM) or `xlsx` (auto-fitted Excel columns). |
+| `GET` | `/health` | Health check endpoint returning platform status, version (`2.0.0`), and active engine mode. |
+
+---
+
+## 📁 Repository Map
+
+```
+keyword-rank-tracker/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                   # Automated GitHub Actions CI workflow
+├── backend/
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes.py                # REST API endpoints, file uploads, delete & config handlers
+│   ├── exports/
+│   │   ├── __init__.py
+│   │   ├── generator.py             # CSV (UTF-8 BOM) and Excel .xlsx spreadsheet generators
+│   │   └── files/                   # Cached report artifacts (auto-cleaned on job delete)
+│   ├── providers/
+│   │   ├── __init__.py              # Provider factory (get_provider)
+│   │   ├── base.py                  # Abstract SerpProvider & Pydantic models (SearchResult)
+│   │   ├── free_serp_provider.py    # Zero-key live SERP provider (DuckDuckGo Lite + SearXNG)
+│   │   ├── mock_provider.py         # Deterministic domain simulation with SHA-256 seeding
+│   │   └── serpapi_provider.py      # SerpApi integration with depth > 100 offset pagination
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── job_processor.py         # Background worker thread & historical rank correlation
+│   │   └── rank_tracker.py          # Domain normalization, CTR curve, cannibalization & competitor SoV
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── test_domain_matching.py  # 23 tests: normalization, subdomains, suffix attacks, best rank
+│   │   └── test_seo_analytics.py    # 10 tests: CTR curves, cannibalization, competitors, recovery
+│   ├── database.py                  # SQLAlchemy engine, ensure_schema_columns & crash reconciliation
+│   ├── Dockerfile                   # Backend Docker container specification
+│   ├── main.py                      # FastAPI entrypoint, lifespan startup tasks & CORS middleware
+│   ├── models.py                    # SQLAlchemy ORM models: Job and KeywordTask
+│   ├── rank_tracker.db              # SQLite development database (auto-migrating)
+│   └── requirements.txt             # Pinned backend Python dependencies
+├── docs/
+│   └── assets/                      # Screenshot and diagram assets
+├── frontend/
+│   ├── public/                      # Static assets & favicon
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── client.ts            # Typed Axios client service
+│   │   ├── components/
+│   │   │   ├── common/
+│   │   │   │   └── CommandPalette.tsx # Global Cmd+K / Ctrl+K search & shortcut modal
+│   │   │   ├── history/
+│   │   │   │   └── HistoryView.tsx    # Searchable scan archive with status badges & deletion
+│   │   │   ├── layout/
+│   │   │   │   └── AppShell.tsx       # Collapsible navigation, engine status, and theme toggle
+│   │   │   ├── results/
+│   │   │   │   ├── BentoAnalyticsHeader.tsx # Organic Visibility SoV gauge & 5-tier cards
+│   │   │   │   ├── CompetitorMatrixView.tsx # Page 1 Competitor domain cross-reference
+│   │   │   │   └── ResultsDataGrid.tsx      # Table, smart filters, and SERP X-Ray drawer
+│   │   │   └── scan/
+│   │   │       └── ScanLaunchpad.tsx  # Drag & drop upload, client preview & 1-click demos
+│   │   ├── types/
+│   │   │   └── index.ts             # TypeScript definitions for jobs, tasks, and telemetry
+│   │   ├── App.tsx                  # Root application orchestrator with visibility-aware polling
+│   │   ├── index.css                # Obsidian theme variables, tabular numbers, animations
+│   │   └── main.tsx                 # React 19 application entrypoint
+│   ├── Dockerfile                   # Frontend multi-stage build container
+│   ├── nginx.conf                   # Nginx reverse proxy configuration for Docker
+│   ├── package.json                 # Node dependencies and scripts
+│   ├── tsconfig.json                # TypeScript compiler configuration
+│   └── vite.config.ts               # Vite configuration with React & Tailwind plugins
+├── .env                             # Local environment variables
+├── .env.example                     # Environment template documentation
+├── ARCHITECTURE.md                  # Comprehensive architectural reference manual
+├── CHANGELOG.md                     # Chronological engineering updates log
+├── docker-compose.yml               # Multi-container orchestration (Backend + Frontend)
+├── sample_keywords.csv              # General sample keywords dataset
+├── start.ps1                        # Windows 1-click dev launcher script
+├── test_github.csv                  # Integration test keywords for GitHub.com
+└── test_wikipedia.csv               # Integration test keywords for Wikipedia.org
+```
+
+---
+
+## 🧪 Testing & Verification
+
+NexusRank enforces strict testing across both backend and frontend layers:
+
+```bash
+# 1. Run backend unit & integration tests (33 tests)
+cd backend
+pytest tests/ -v
+
+# 2. Run frontend linter (Oxlint)
+cd frontend
+npm run lint
+
+# 3. Build frontend bundle (TypeScript + Vite)
+npm run build
+```
+
+**Continuous Integration:** Every commit and pull request triggers `.github/workflows/ci.yml`, running the full pytest suite on Python 3.11 and validating `npm run lint` and `npm run build` on Node 20.
+
+---
+
+## 🗺️ Open-Source Roadmap & Contributing
+
+We welcome contributions from the community! Here are our active development milestones:
+- [ ] **Automated Scheduled Scans:** Built-in cron / recurring daily rank checks using APScheduler.
+- [ ] **Local LLM SEO Action Briefs:** Native integration with Ollama to generate full content briefs on local models ($0 cost).
+- [ ] **Alert Webhooks:** Instant Discord, Slack, and email notifications when high-priority keywords drop out of Page 1.
+- [ ] **Additional Search Engines:** Bing, Yahoo, and Baidu search abstraction providers.
+
+### How to Contribute
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m 'Add amazing feature'`).
+4. Ensure all tests pass (`pytest tests/ -v && npm run build`).
+5. Push to your branch (`git push origin feature/amazing-feature`).
+6. Open a Pull Request.
+
+---
+
+## 📜 License
+
+NexusRank is open-source software licensed under the [MIT License](LICENSE).  
+Free for personal, commercial, and enterprise use.
+
+---
+
+<div align="center">
+  <sub>Built with precision for SEO engineers, indie hackers, and growth teams worldwide.</sub>
+</div>

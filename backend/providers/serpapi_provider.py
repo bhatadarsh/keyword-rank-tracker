@@ -1,5 +1,8 @@
 import os
+import math
+import urllib.parse
 import logging
+from typing import Optional
 import httpx
 from providers.base import SerpProvider, SearchResponse, SearchResult
 
@@ -89,9 +92,22 @@ LANGUAGE_MAP = {
 }
 
 
+def _extract_domain(url: str) -> str:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.netloc.lower()
+        if ":" in host:
+            host = host.split(":")[0]
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+    except Exception:
+        return ""
+
+
 class SerpApiProvider(SerpProvider):
     """
-    SerpApi.com integration.
+    SerpApi.com integration with automatic multi-page pagination for depth > 100.
     Docs: https://serpapi.com/search-api
     """
 
@@ -111,6 +127,7 @@ class SerpApiProvider(SerpProvider):
         language: str,
         device: str,
         depth: int = 100,
+        target_domain: Optional[str] = None,
     ) -> SearchResponse:
         if not self.api_key:
             return SearchResponse(
@@ -125,80 +142,97 @@ class SerpApiProvider(SerpProvider):
 
         if gl == "us" and country.lower() not in ("united states", "usa", "us"):
             logger.warning(
-                "Country '%s' not found in map, defaulting to 'us'. "
-                "Add it to COUNTRY_MAP in serpapi_provider.py.",
+                "Country '%s' not found in map, defaulting to 'us'.",
                 country,
             )
 
-        params = {
-            "q": keyword,
-            "engine": "google",
-            "api_key": self.api_key,
-            "num": min(depth, 100),  # SerpApi max per-page is 100
-            "gl": gl,
-            "hl": hl,
-            "device": "desktop" if device.lower() == "desktop" else "mobile",
-            "no_cache": "true",  # Always fetch fresh results
-        }
-
-        logger.info(
-            "Searching SerpApi | keyword=%r gl=%s hl=%s device=%s num=%d",
-            keyword,
-            gl,
-            hl,
-            params["device"],
-            params["num"],
-        )
+        max_pages = max(1, math.ceil(depth / 100))
+        all_results = []
 
         try:
-            response = httpx.get(self.base_url, params=params, timeout=30.0)
-            response.raise_for_status()
-            data = response.json()
+            with httpx.Client(timeout=35.0) as client:
+                for page in range(max_pages):
+                    start_offset = page * 100
+                    num_for_page = min(depth - start_offset, 100)
+                    if num_for_page <= 0:
+                        break
 
-            if "error" in data:
-                logger.error("SerpApi returned error: %s", data["error"])
-                return SearchResponse(
-                    keyword=keyword,
-                    results=[],
-                    error=data["error"],
-                    status="api_error",
-                )
+                    params = {
+                        "q": keyword,
+                        "engine": "google",
+                        "api_key": self.api_key,
+                        "num": num_for_page,
+                        "start": start_offset,
+                        "gl": gl,
+                        "hl": hl,
+                        "device": "desktop" if device.lower() == "desktop" else "mobile",
+                        "no_cache": "true",
+                    }
 
-            results = []
-            organic_results = data.get("organic_results", [])
-
-            for res in organic_results:
-                results.append(
-                    SearchResult(
-                        rank=res.get("position", 0),
-                        url=res.get("link", ""),
-                        title=res.get("title", ""),
+                    logger.info(
+                        "SerpApi request | page=%d start=%d num=%d keyword=%r",
+                        page + 1, start_offset, num_for_page, keyword,
                     )
-                )
 
-            logger.info("Got %d organic results for %r", len(results), keyword)
-            return SearchResponse(keyword=keyword, results=results)
+                    response = client.get(self.base_url, params=params)
+                    response.raise_for_status()
+                    data = response.json()
+
+                    if "error" in data:
+                        logger.error("SerpApi returned error: %s", data["error"])
+                        if not all_results:
+                            return SearchResponse(
+                                keyword=keyword,
+                                results=[],
+                                error=data["error"],
+                                status="api_error",
+                            )
+                        break
+
+                    organic_results = data.get("organic_results", [])
+                    if not organic_results:
+                        break
+
+                    for idx, res in enumerate(organic_results, start=1):
+                        pos = res.get("position", idx)
+                        computed_rank = start_offset + pos
+                        url = res.get("link", "")
+                        all_results.append(
+                            SearchResult(
+                                rank=computed_rank,
+                                url=url,
+                                title=res.get("title", ""),
+                                domain=_extract_domain(url),
+                            )
+                        )
+
+                    # If fewer results returned than requested, end of SERP reached
+                    if len(organic_results) < num_for_page:
+                        break
+
+            logger.info("SerpApi collected %d total results for %r", len(all_results), keyword)
+            return SearchResponse(keyword=keyword, results=all_results, status="success")
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 logger.warning("SerpApi rate limit hit for keyword %r", keyword)
                 return SearchResponse(
                     keyword=keyword,
-                    results=[],
+                    results=all_results,
                     error="Rate limited by SerpApi",
                     status="rate_limited",
                 )
             logger.error("HTTP error from SerpApi: %s", e)
             return SearchResponse(
-                keyword=keyword, results=[], error=str(e), status="api_error"
+                keyword=keyword, results=all_results, error=str(e), status="api_error"
             )
         except httpx.TimeoutException as e:
             logger.error("Timeout reaching SerpApi for keyword %r: %s", keyword, e)
             return SearchResponse(
-                keyword=keyword, results=[], error=str(e), status="timeout"
+                keyword=keyword, results=all_results, error=str(e), status="timeout"
             )
         except httpx.RequestError as e:
             logger.error("Request error for keyword %r: %s", keyword, e)
             return SearchResponse(
-                keyword=keyword, results=[], error=str(e), status="api_error"
+                keyword=keyword, results=all_results, error=str(e), status="api_error"
             )
