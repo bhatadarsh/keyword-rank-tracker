@@ -64,71 +64,87 @@
 graph TD
     User["👤 User (Browser)"]
 
-    subgraph Frontend ["Frontend — React SPA (Vite :5173)"]
-        UI_Form["ConfigForm\ncompany, domain, country,\nlanguage, device, depth, file"]
-        UI_Results["ResultsPanel\nRank Tier Cards · Table · Filters"]
-        UI_History["HistoryView\nPast scan list"]
-        UI_Toast["ToastContainer"]
+    subgraph Frontend ["Frontend — React 19 SPA (Vite :5173)"]
+        UI_Shell["AppShell.tsx\nClean 240px Sidebar · Theme Switch · Engine Status"]
+        UI_Onboarding["WelcomeGuideBanner.tsx\n3-Step Interactive Walkthrough · LocalStorage"]
+        UI_Launch["ScanLaunchpad.tsx\nDrag & Drop CSV Preview · 1-Click Demos · Engine Select"]
+        UI_Bento["BentoAnalyticsHeader.tsx\nOrganic Visibility SoV % · 4 Metric Cards · InfoTooltip"]
+        UI_Grid["ResultsDataGrid.tsx\nTable (py-3.5) · Opportunities (11-30) · SERP X-Ray Drawer"]
+        UI_Comp["CompetitorMatrixView.tsx\nPage 1 Domain Cross-Reference & Dominance"]
+        UI_History["HistoryView.tsx\nPast Scans · Reload · Delete · Export"]
+        UI_Help["HelpView.tsx\nGlossary · Engine Comparison · Sample CSV Download"]
+        UI_Palette["CommandPalette.tsx\nCmd+K / Ctrl+K Modal Controller"]
     end
 
     subgraph Backend ["Backend — FastAPI (Uvicorn :8000)"]
         MW_CORS["CORSMiddleware\nallow: localhost:5173"]
         Router["api/routes.py\nAPIRouter prefix=/api/rank-check"]
+        EP_CONFIG["GET /api/config — get_config()"]
         EP_POST["POST / — create_job()"]
         EP_GET["GET /{job_id} — get_job_status()"]
         EP_LIST["GET / — list_jobs()"]
+        EP_DELETE["DELETE /{job_id} — delete_job()"]
         EP_DL["GET /{job_id}/download/{fmt}"]
+        EP_HEALTH["GET /health — health_check()"]
     end
 
-    subgraph Services ["Services Layer"]
-        JP["services/job_processor.py\nprocess_job()"]
-        RT["services/rank_tracker.py\nnormalize_domain()\nmatch_domain()\ncalculate_best_rank()"]
-        EX["exports/generator.py\ngenerate_csv()\ngenerate_excel()"]
+    subgraph Services ["Services & Intelligence Layer"]
+        JP["services/job_processor.py\nprocess_job() · historical delta correlation"]
+        RT["services/rank_tracker.py\nnormalize_domain() · calculate_visibility_score()\nanalyze_serp_intelligence() · aggregate_top_competitors()"]
+        EX["exports/generator.py\ngenerate_csv() · generate_excel()"]
     end
 
-    subgraph Providers ["Provider Abstraction"]
-        PF["providers/__init__.py\nget_provider() factory\nreads SERP_PROVIDER env"]
-        MOCK["providers/mock_provider.py\nMockProvider\n80% found rate, simulated latency"]
-        SERP["providers/serpapi_provider.py\nSerpApiProvider\nhttpx GET serpapi.com/search"]
+    subgraph Providers ["Multi-Engine Provider Abstraction"]
+        PF["providers/__init__.py\nget_provider(name) factory"]
+        FREE["providers/free_serp_provider.py\nFreeSerpProvider (DuckDuckGo Lite + SearXNG)"]
+        MOCK["providers/mock_provider.py\nMockProvider (SHA-256 Dynamic Deterministic Simulation)"]
+        SERP["providers/serpapi_provider.py\nSerpApiProvider (Official API + Depth > 100 Pagination)"]
     end
 
     subgraph DB ["Data Layer — SQLAlchemy"]
-        DBEngine["database.py\nSessionLocal · engine · Base"]
-        Jobs["jobs table"]
-        Tasks["keyword_tasks table"]
+        DBEngine["database.py\nensure_schema_columns() · reconcile_orphan_jobs()"]
+        Jobs["jobs table (visibility_score, provider, competitors)"]
+        Tasks["keyword_tasks table (rank, delta, secondary_url, json)"]
     end
 
+    ExtLive["🌐 DuckDuckGo / SearXNG\nZero-Key Live Search"]
     ExtAPI["🌐 serpapi.com\nProxied Google Search API"]
 
-    User -->|"fill form + upload CSV"| UI_Form
-    UI_Form -->|"POST multipart/form-data"| EP_POST
-    UI_Results -->|"GET poll every 2s"| EP_GET
+    User -->|"interact"| UI_Shell
+    UI_Launch -->|"POST multipart/form-data"| EP_POST
+    UI_Grid & UI_Bento -->|"GET poll every 2s"| EP_GET
     UI_History -->|"GET"| EP_LIST
-    UI_Results -->|"window.location.href"| EP_DL
+    UI_History -->|"DELETE"| EP_DELETE
+    UI_Grid -->|"window.location.href"| EP_DL
+    UI_Shell -->|"GET"| EP_CONFIG
 
     EP_POST --> MW_CORS
     MW_CORS --> Router
+    Router --> EP_CONFIG
     Router --> EP_POST
     Router --> EP_GET
     Router --> EP_LIST
+    Router --> EP_DELETE
     Router --> EP_DL
 
     EP_POST -->|"db.add Job + KeywordTasks"| DBEngine
     EP_POST -->|"FastAPI BackgroundTasks"| JP
     EP_GET -->|"db.query"| DBEngine
     EP_LIST -->|"db.query"| DBEngine
+    EP_DELETE -->|"db.delete"| DBEngine
     EP_DL --> EX
 
     JP -->|"db.query pending tasks"| DBEngine
     JP --> PF
     JP --> RT
-    JP -->|"db.commit results"| DBEngine
+    JP -->|"db.commit results per keyword"| DBEngine
 
-    PF -->|"SERP_PROVIDER=mock"| MOCK
-    PF -->|"SERP_PROVIDER=serpapi"| SERP
+    PF -->|"provider=free"| FREE
+    PF -->|"provider=mock"| MOCK
+    PF -->|"provider=serpapi"| SERP
 
-    SERP -->|"httpx.get + SERP_API_KEY"| ExtAPI
-    ExtAPI -->|"organic_results[]"| SERP
+    FREE -->|"httpx.get organic parsing"| ExtLive
+    SERP -->|"httpx.get + offset pagination"| ExtAPI
 
     DBEngine --- Jobs
     DBEngine --- Tasks
@@ -142,72 +158,94 @@ graph TD
 ```
 keyword-rank-tracker/
 │
+├── .github/
+│   └── workflows/
+│       └── ci.yml                   # Automated GitHub Actions CI workflow (pytest + npm build)
 ├── .env.example                  # Template env vars (safe to commit)
+├── .env                          # Local environment variables (gitignored)
 ├── .gitignore                    # Excludes venv, .env, *.db, exports/files/, node_modules
-├── .gitattributes
-├── start.ps1                     # ⭐ Windows dev launcher (kills ports, starts both servers)
+├── docker-compose.yml            # Multi-container production orchestration (Backend + Frontend)
+├── start.ps1                     # ⭐ Windows 1-click dev launcher (venv, npm, kills ports, starts servers)
+├── start.sh                      # ⭐ macOS/Linux 1-script launcher (auto-setup, traps Ctrl+C)
 ├── sample_keywords.csv           # Example CSV with keyword/country/language/device columns
 ├── test_github.csv               # 10 keywords for github.com (integration test data)
 ├── test_wikipedia.csv            # 10 keywords for wikipedia.org (gold-standard verification)
-├── README.md                     # Full system design doc with Mermaid diagrams
+├── README.md                     # Flagship open-source documentation with architecture diagrams
 ├── CHANGELOG.md                  # Chronological development log
+├── ARCHITECTURE.md               # Technical architecture and onboarding specification
 │
 ├── backend/
-│   ├── main.py                   # ⭐ FastAPI app entrypoint — creates tables, registers CORS + router
-│   ├── database.py               # SQLAlchemy engine factory; get_db() session dependency
-│   ├── models.py                 # Job + KeywordTask ORM models; JobStatus + KeywordStatus enums
-│   ├── requirements.txt          # Pinned Python dependencies
-│   ├── .env                      # Actual secrets (gitignored); SERP_PROVIDER, SERP_API_KEY, DATABASE_URL
-│   ├── rank_tracker.db           # SQLite file (auto-created; gitignored in production)
+│   ├── main.py                   # ⭐ FastAPI app entrypoint with lifespan startup tasks (migration & recovery)
+│   ├── database.py               # SQLAlchemy engine factory, ensure_schema_columns() & reconcile_orphan_jobs()
+│   ├── models.py                 # Job + KeywordTask ORM models with SoV, delta & cannibalization fields
+│   ├── requirements.txt          # Pinned Python dependencies (FastAPI, SQLAlchemy, Pydantic, etc.)
+│   ├── Dockerfile                # Backend container definition
+│   ├── rank_tracker.db           # SQLite development database (auto-created & auto-migrating)
 │   │
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── routes.py             # ⭐ All 4 REST endpoints: POST, GET status, GET list, GET download
+│   │   └── routes.py             # ⭐ REST endpoints: POST, GET status, GET list, DELETE, GET config, GET download
 │   │
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── job_processor.py      # ⭐ Background task: loops tasks, calls provider, writes results
-│   │   └── rank_tracker.py       # Domain normalization + matching + best-rank extraction
+│   │   ├── job_processor.py      # ⭐ Background worker thread: delta correlation, provider loop, per-keyword commit
+│   │   └── rank_tracker.py       # Domain normalization, CTR Visibility Score (SoV %), cannibalization & competitor aggregation
 │   │
 │   ├── providers/
-│   │   ├── __init__.py           # get_provider() factory (reads SERP_PROVIDER env var)
+│   │   ├── __init__.py           # get_provider() factory (free, mock, serpapi)
 │   │   ├── base.py               # Abstract SerpProvider + SearchResult/SearchResponse Pydantic models
-│   │   ├── mock_provider.py      # Fake SERP — 80% found rate, simulated latency, error injection
-│   │   └── serpapi_provider.py   # Real SerpApi integration: country/lang maps, httpx, error handling
+│   │   ├── free_serp_provider.py # 100% Zero-key live SERP search via DuckDuckGo Lite & SearXNG
+│   │   ├── mock_provider.py      # Dynamic domain simulation with deterministic SHA-256 seeding
+│   │   └── serpapi_provider.py   # SerpApi integration with depth > 100 offset pagination
 │   │
 │   ├── exports/
 │   │   ├── __init__.py
-│   │   ├── generator.py          # generate_csv() and generate_excel() via pandas + openpyxl
+│   │   ├── generator.py          # UTF-8 BOM CSV and auto-fitted Excel (.xlsx) report generator
 │   │   └── files/                # Generated export files (gitignored); named results_{job_id}.{fmt}
 │   │
 │   ├── tests/
 │   │   ├── __init__.py
-│   │   └── test_domain_matching.py  # 18 pytest tests: TestNormalizeDomain, TestMatchDomain, TestCalculateBestRank
+│   │   ├── test_domain_matching.py  # 23 pytest tests: normalization, subdomains, suffix attacks, best rank
+│   │   └── test_seo_analytics.py    # 10 pytest tests: CTR curve, cannibalization, competitors, recovery
 │   │
 │   └── venv/                     # Python virtual environment (gitignored)
 │
 └── frontend/
-    ├── index.html                # Vite SPA shell — mounts <div id="root">
+    ├── index.html                # Vite SPA shell with Inter & JetBrains Mono font preloads
     ├── vite.config.ts            # Vite config: React + Tailwind plugins; /api proxy → :8000
-    ├── package.json              # NPM manifest with all dependencies
-    ├── tsconfig.json             # TypeScript project references config
-    ├── tsconfig.app.json         # App target TS config (strict mode)
-    ├── tsconfig.node.json        # Node tools TS config
-    ├── .oxlintrc.json            # Oxlint (Rust linter) config
-    │
-    ├── public/
-    │   ├── favicon.svg
-    │   └── icons.svg
+    ├── package.json              # NPM manifest with React 19, TypeScript, Tailwind v4
+    ├── tsconfig.json             # TypeScript compiler config
+    ├── Dockerfile                # Multi-stage production container build
+    ├── nginx.conf                # Nginx reverse proxy configuration for Docker
     │
     └── src/
-        ├── main.tsx              # React entry: ReactDOM.createRoot → <App /> in StrictMode
-        ├── App.tsx               # ⭐ Entire frontend: 998 lines, all components in one file
-        ├── App.css               # (minimal; most styling is Tailwind utility classes)
-        ├── index.css             # @import "tailwindcss" + Outfit font + custom scrollbar
-        └── assets/
-            ├── hero.png
-            ├── react.svg
-            └── vite.svg
+        ├── main.tsx              # React entry: ReactDOM.createRoot → <App />
+        ├── App.tsx               # Root application orchestrator with visibility-aware polling
+        ├── index.css             # Inter & JetBrains Mono typography, true neutral Zinc tokens
+        ├── api/
+        │   └── client.ts         # Typed Axios client service
+        ├── hooks/
+        │   └── useOnboarding.ts  # Persistent localStorage interactive walkthrough state
+        ├── types/
+        │   └── index.ts          # TypeScript interfaces for jobs, tasks, views, and telemetry
+        └── components/
+            ├── common/
+            │   ├── CommandPalette.tsx # Global Cmd+K / Ctrl+K search & navigation modal
+            │   └── InfoTooltip.tsx    # Accessible contextual popover tooltip for metrics
+            ├── help/
+            │   └── HelpView.tsx       # Built-in Help & Glossary center with sample CSV download
+            ├── history/
+            │   └── HistoryView.tsx    # Searchable scan archive with status badges & deletion
+            ├── layout/
+            │   └── AppShell.tsx       # Clean 240px navigation, engine status, and theme toggle
+            ├── onboarding/
+            │   └── WelcomeGuideBanner.tsx # Dismissible 3-step interactive onboarding card
+            ├── results/
+            │   ├── BentoAnalyticsHeader.tsx # Organic Visibility SoV gauge & 4 clean metric cards
+            │   ├── CompetitorMatrixView.tsx # Page 1 Competitor domain cross-reference
+            │   └── ResultsDataGrid.tsx      # Table, smart filters, and SERP X-Ray drawer
+            └── scan/
+                └── ScanLaunchpad.tsx  # Centered form, drag & drop upload & 1-click demos
 ```
 
 ### Entry Points
@@ -354,49 +392,50 @@ api/routes.py :: download_results()   [lines 222–253]
 ### Database Schema
 
 ```
-┌──────────────────────────────────────────┐
-│                  jobs                    │
-├────────────────┬─────────────────────────┤
-│ id             │ VARCHAR(UUID) PK        │  str(uuid.uuid4())
-│ status         │ VARCHAR (JobStatus)     │  queued|processing|completed|failed
-│ company_name   │ VARCHAR NOT NULL        │
-│ domain         │ VARCHAR NOT NULL        │  normalized (bare hostname)
-│ country        │ VARCHAR NOT NULL        │  human-readable ("India")
-│ language       │ VARCHAR NOT NULL        │  human-readable ("English")
-│ device         │ VARCHAR NOT NULL        │  "desktop" | "mobile"
-│ depth          │ INTEGER DEFAULT 100     │  100 | 200 | 500
-│ created_at     │ DATETIME DEFAULT now()  │
-└────────────────┴─────────────────────────┘
-         │ 1:N (cascade delete-orphan)
-         ▼
-┌──────────────────────────────────────────┐
-│             keyword_tasks                │
-├────────────────┬─────────────────────────┤
-│ id             │ INTEGER PK autoincrement │
-│ job_id         │ VARCHAR FK → jobs.id    │  indexed
-│ keyword        │ VARCHAR NOT NULL        │  indexed
-│ country        │ VARCHAR NOT NULL        │  per-row override or job default
-│ language       │ VARCHAR NOT NULL        │  per-row override or job default
-│ device         │ VARCHAR NOT NULL        │  per-row override or job default
-│ rank           │ INTEGER NULLABLE        │  NULL until processed
-│ ranking_url    │ VARCHAR NULLABLE        │  NULL until processed
-│ page_title     │ VARCHAR NULLABLE        │  NULL until processed
-│ status         │ VARCHAR (KeywordStatus) │  pending|found|not_found|api_error|rate_limited|timeout|invalid
-└────────────────┴─────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│                        jobs                            │
+├─────────────────────────┬──────────────────────────────┤
+│ id                      │ VARCHAR(UUID) PK             │  str(uuid.uuid4())
+│ status                  │ VARCHAR (JobStatus)          │  queued|processing|completed|failed
+│ company_name            │ VARCHAR NOT NULL             │
+│ domain                  │ VARCHAR NOT NULL             │  normalized (bare hostname)
+│ provider                │ VARCHAR DEFAULT "free"       │  free | mock | serpapi
+│ country                 │ VARCHAR NOT NULL             │  human-readable ("United States")
+│ language                │ VARCHAR NOT NULL             │  human-readable ("English")
+│ device                  │ VARCHAR NOT NULL             │  "desktop" | "mobile"
+│ depth                   │ INTEGER DEFAULT 100          │  100 | 200 | 500
+│ visibility_score        │ FLOAT DEFAULT 0.0            │  CTR-weighted SoV (0–100%)
+│ top_competitors_summary │ JSON NULLABLE                │  Top 5 Page 1 competing domains
+│ created_at              │ DATETIME DEFAULT now()       │
+└─────────────────────────┴──────────────────────────────┘
+          │ 1:N (cascade delete-orphan)
+          ▼
+┌────────────────────────────────────────────────────────┐
+│                   keyword_tasks                        │
+├─────────────────────────┬──────────────────────────────┤
+│ id                      │ INTEGER PK autoincrement     │
+│ job_id                  │ VARCHAR FK → jobs.id         │  indexed
+│ keyword                 │ VARCHAR NOT NULL             │  indexed
+│ country                 │ VARCHAR NOT NULL             │  per-row override or job default
+│ language                │ VARCHAR NOT NULL             │  per-row override or job default
+│ device                  │ VARCHAR NOT NULL             │  per-row override or job default
+│ rank                    │ INTEGER NULLABLE             │  NULL until processed
+│ previous_rank           │ INTEGER NULLABLE             │  correlated from historical scans
+│ rank_delta              │ INTEGER NULLABLE             │  position change (+5, -2, NULL for NEW)
+│ ranking_url             │ VARCHAR NULLABLE             │  primary ranking URL
+│ page_title              │ VARCHAR NULLABLE             │  page title tag
+│ matching_urls_count     │ INTEGER DEFAULT 0            │  distinct ranking URLs from domain
+│ secondary_ranking_url   │ VARCHAR NULLABLE             │  conflicting secondary URL
+│ secondary_rank          │ INTEGER NULLABLE             │  secondary URL rank position
+│ cannibalization         │ BOOLEAN DEFAULT FALSE        │  TRUE if matching_urls_count >= 2
+│ top_competitors_json    │ JSON NULLABLE                │  Top 5 SERP competitors snapshot
+│ status                  │ VARCHAR (KeywordStatus)      │  pending|found|not_found|api_error...
+└─────────────────────────┴──────────────────────────────┘
 ```
 
-**Keyword Status Lifecycle:**
-```
-pending → found         (domain found in SERP results)
-        → not_found     (domain absent from top N results)
-        → api_error     (SerpApi returned error or HTTP non-429 error)
-        → rate_limited  (HTTP 429, exhausted retries)
-        → timeout       (httpx timeout, exhausted retries)
-```
-
-**ORM relationships:**
-- `Job.tasks` → `relationship("KeywordTask", back_populates="job", cascade="all, delete-orphan")`
-- `KeywordTask.job` → `relationship("Job", back_populates="tasks")`
+**Auto-Migration & Database Resilience:**
+- `ensure_schema_columns(engine)`: Executes dynamic non-destructive `ALTER TABLE ADD COLUMN` queries inspecting `PRAGMA table_info` on startup.
+- `reconcile_orphan_jobs()`: On application boot, reconciles any orphaned jobs stuck in `queued` or `processing` states from server interruptions and marks them `failed`.
 
 ---
 
@@ -404,35 +443,21 @@ pending → found         (domain found in SERP results)
 
 | Integration | Type | Location | Notes |
 |---|---|---|---|
-| **SerpApi** (`serpapi.com`) | REST API (GET) | `providers/serpapi_provider.py` | Proxied Google Search; `no_cache=true` always; max 100 results per call; docs: `serpapi.com/search-api` |
-| **Mock Provider** | In-process simulation | `providers/mock_provider.py` | 80% found rate, 4% error rate, 1% rate-limit rate; hardcoded `TARGET_DOMAIN = "hiree.com"` |
-
-**SerpApi request parameters built in `SerpApiProvider.search()`:**
-
-| Param | Value | Notes |
-|---|---|---|
-| `q` | keyword | raw search query |
-| `engine` | `"google"` | hardcoded |
-| `api_key` | `SERP_API_KEY` | from env |
-| `num` | `min(depth, 100)` | SerpApi cap is 100 per page |
-| `gl` | `COUNTRY_MAP[country.lower()]` | 50+ countries mapped; falls back to `"us"` with warning |
-| `hl` | `LANGUAGE_MAP[language.lower()]` | 24 languages mapped; falls back to `"en"` |
-| `device` | `"desktop"` or `"mobile"` | |
-| `no_cache` | `"true"` | always fetch fresh |
-
-> [!IMPORTANT]
-> `depth` values of 200 or 500 are accepted by the form but SerpApi's `num` parameter is capped at 100. The current code uses `min(depth, 100)`. Depths > 100 would require pagination via SerpApi's `start` parameter — this is **not implemented**.
+| **FreeSerpProvider** | Live SERP (Zero Key) | `providers/free_serp_provider.py` | 100% Zero-cost live search via DuckDuckGo Lite HTML parsing and public/private SearXNG instances with User-Agent rotation. |
+| **MockProvider** | In-process simulation | `providers/mock_provider.py` | Deterministic SHA-256 dynamic domain simulation (`hash(keyword + target_domain)`), realistic competitor pools (`wikipedia.org`, `reddit.com`, `github.com`), and multi-URL cannibalization modeling. |
+| **SerpApiProvider** | REST API (Official) | `providers/serpapi_provider.py` | Official Google Search API with automated offset pagination (`start = page * 100`) supporting deep scans up to 500 ranks. |
 
 ---
 
 ### Configuration & Secrets
 
-**File:** `backend/.env` (copied from `.env.example` on setup)
+**File:** `backend/.env` (and root `.env`, copied from `.env.example` on setup)
 
 | Variable | Example Value | Required | Description |
 |---|---|---|---|
 | `DATABASE_URL` | `sqlite:///./rank_tracker.db` | No (has default) | SQLAlchemy connection string. Switch to `postgresql://user:pass@host/db` for production |
-| `SERP_PROVIDER` | `mock` or `serpapi` | No (defaults to `mock`) | Selects provider. `mock` = no API key needed; `serpapi` = real Google data |
+| `SERP_PROVIDER` | `free`, `mock`, or `serpapi` | No (defaults to `free`) | Selects default engine: `free` (100% $0 live search), `mock` (simulation), or `serpapi` (paid API) |
+| `SEARXNG_URL` | `https://searx.be/search` | No | Optional public or private SearXNG instance for `FreeSerpProvider` |
 | `SERP_API_KEY` | `0c5926c72...` | Only if `SERP_PROVIDER=serpapi` | SerpApi.com API key. Obtain from `serpapi.com/manage-api-key` |
 
 **Load order:** `main.py` calls `load_dotenv()` as the **first** statement before any other import that calls `os.getenv()`. This is critical — moving it after imports breaks secret loading.
@@ -496,134 +521,75 @@ gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
 pytest tests/ -v
 ```
 
-Currently 1 test file: `tests/test_domain_matching.py` with **18 tests** across 3 classes:
+NexusRank includes **33 unit & integration tests** across 2 comprehensive test suites:
 
-| Class | Coverage |
-|---|---|
-| `TestNormalizeDomain` | 9 tests: https stripping, http stripping, www stripping, path stripping, query param stripping, trailing slash, subdomain preservation, bare domain, empty string safety |
-| `TestMatchDomain` | 6 tests: exact match, www match, subdomain match, deep subdomain, different domain, path-contains-name (no match), suffix attack prevention, partial TLD |
-| `TestCalculateBestRank` | 6 tests: found at rank 3, multiple appearances returns best rank, not found returns None, empty results, rank is positive int, title is returned |
+| Suite | Test Class | Coverage |
+|---|---|---|
+| `tests/test_domain_matching.py` (23 tests) | `TestNormalizeDomain` (9) | https/http/www/path stripping, query params, trailing slashes, subdomain preservation, bare domain, empty safety |
+| | `TestMatchDomain` (8) | exact match, www match, subdomain match, deep subdomain, different domain, path-contains-name, suffix attacks, partial TLD |
+| | `TestCalculateBestRank` (6) | found at rank 3, multiple appearances returns best rank, not found, empty results, rank is positive int, title returned |
+| `tests/test_seo_analytics.py` (10 tests) | `TestVisibilityAndCTR` (4) | standard CTR curve calculation, perfect 100% score, empty/unranked scores, mixed rank distributions |
+| | `TestCannibalizationAndIntelligence` (4) | single URL clean state, multiple URLs cannibalization trigger, top 5 competitor extraction, competitor aggregation |
+| | `TestDynamicMockEngine` (1) | dynamic target domain simulation without hardcoding |
+| | `TestDatabaseReconciliation` (1) | orphan crash reconciliation execution |
 
-**Frontend lint:**
+**Frontend Lint & Build:**
 ```powershell
 cd frontend
-npm run lint    # oxlint (Rust-based, very fast)
+npm run lint    # oxlint (Rust-based, zero warnings)
+npm run build   # tsc -b && vite build (compiles cleanly)
 ```
 
-### Containerization / CI/CD
+### Containerization & CI/CD Pipelines
 
-> [!WARNING]
-> There is **no Dockerfile, docker-compose.yml, Kubernetes manifests, or CI/CD pipeline** in this repository. No `.github/workflows/` directory exists. The project is purely local-dev at this stage.
-
-The README explicitly notes planned next steps:
-- GitHub Actions to run pytest on every push
-- PostgreSQL + Alembic migrations
-- Redis + Celery worker queue
+NexusRank includes institutional-grade containerization and automation:
+- **`backend/Dockerfile`**: Python 3.13-slim image running FastAPI with Uvicorn.
+- **`frontend/Dockerfile`**: Multi-stage Node 20 build outputting static assets to Nginx alpine reverse proxy.
+- **`docker-compose.yml`**: 1-command orchestration (`docker compose up --build`) binding frontend to `:5173` and backend to `:8000`.
+- **`.github/workflows/ci.yml`**: Automated GitHub Actions CI workflow running backend pytest (Python 3.11) and frontend `npm run lint` + `npm run build` (Node 20) on all pushes and pull requests.
 
 ---
 
-## 6. Technical Debt, Edge Cases & "Gotchas"
+## 6. Technical Debt, Architecture Decisions & "Gotchas"
 
-### 🔴 Critical: BackgroundTasks are In-Process and Non-Persistent
-
-`process_job()` runs in FastAPI's threadpool via `BackgroundTasks`. If the Uvicorn process restarts mid-job:
-- The job row will remain in `status="processing"` forever — it **never transitions to "failed"**
-- There is no startup reconciliation (no code at startup that finds and fails "processing" jobs)
-- **Impact:** Stale "processing" jobs accumulate in the History view after crashes
-
-**Mitigation today:** Restart the server manually and re-submit the job  
-**Fix:** Startup hook that sets `status="failed"` for all jobs stuck in `processing`
+### ✅ Resolved: Startup Crash Reconciliation (`reconcile_orphan_jobs()`)
+Previously, background tasks that crashed mid-job left rows stranded in `status="processing"`. This is now resolved: on startup, `database.reconcile_orphan_jobs()` finds any orphaned `queued` or `processing` jobs and transitions them to `status="failed"`.
 
 ---
 
-### 🔴 Critical: depth > 100 is Silently Truncated
-
-The UI offers "Top 200" and "Top 500" options. The form validation allows `depth ∈ {100, 200, 500}`. But in `SerpApiProvider.search()`:
-```python
-"num": min(depth, 100),  # SerpApi max per-page is 100
-```
-Selecting "Top 500" actually only checks 100 results with **no error or warning to the user**. SerpApi pagination (`start` offset) is not implemented.
+### ✅ Resolved: Paginated SerpApi Depth for > 100 Ranks
+Previously, depth requests for 200 or 500 were silently capped at 100. This is now resolved: `SerpApiProvider.search()` loops with `start = page * 100` up to `depth`, aggregating results and offsetting rank indices accurately.
 
 ---
 
-### 🟠 High: Hardcoded `TARGET_DOMAIN` in MockProvider
-
-```python
-# providers/mock_provider.py line 38
-TARGET_DOMAIN = "hiree.com"  # Domain that will be "found" in mock results
-```
-
-In mock mode, **only** `hiree.com` appears in fake SERP results. If you submit a job for `github.com` with `SERP_PROVIDER=mock`, it will always return `not_found`. This can confuse new developers expecting mock mode to simulate any domain.
+### ✅ Resolved: Dynamic Domain Simulation (Mock Engine)
+The hardcoded `"hiree.com"` mock was eliminated. `MockProvider` now accepts `target_domain` and uses deterministic SHA-256 seeding (`hash(keyword + target_domain)`), ensuring realistic rank movements, simulated competitor domains (`wikipedia.org`, `reddit.com`), and multi-URL cannibalization scenarios for any domain.
 
 ---
 
-### 🟠 High: No Schema Migration Tool
-
-SQLAlchemy's `Base.metadata.create_all()` creates tables on startup but **does not alter existing tables**. If you add a column to a model (like `page_title` was added in Session 2), you must:
-1. Delete `rank_tracker.db` (losing all history), or
-2. Run a manual `ALTER TABLE` SQL, or
-3. Add Alembic (recommended future fix)
-
-The CHANGELOG explicitly notes this happened once: `"Deleted stale SQLite database that was missing the new page_title column."`
+### ✅ Resolved: Dynamic Schema Auto-Migration (`ensure_schema_columns()`)
+SQLite schema drift is handled automatically without manual database deletion. On startup, `ensure_schema_columns()` inspects `PRAGMA table_info` and executes non-destructive `ALTER TABLE ADD COLUMN` for all new fields (`provider`, `visibility_score`, `top_competitors_summary`, `rank_delta`, `secondary_ranking_url`, `top_competitors_json`).
 
 ---
 
-### 🟠 High: Single DB Session per Background Task (Thread Safety)
-
-`process_job()` opens its own `SessionLocal()` (line 24) instead of using the dependency-injected session from the request. This is **correct** for background tasks (request sessions close at response time), but it means:
-- The background task's session is entirely separate from any concurrent API requests
-- If the DB connection drops mid-job, the whole task crashes (caught by the outer `except Exception`)
-- With SQLite: `check_same_thread=False` is set in `database.py` to allow this multi-thread usage
+### ✅ Resolved: Single Source of Truth for Locales (`GET /api/config`)
+The frontend no longer hardcodes country and language maps. `GET /api/config` serves supported countries, languages, and provider status dynamically from the backend provider dictionaries.
 
 ---
 
-### 🟡 Medium: Polling is Client-Side Only (No WebSockets / SSE)
-
-The frontend polls `GET /api/rank-check/{jobId}` every **2 seconds** regardless of job size:
-```typescript
-// App.tsx line 769
-intervalRef.current = setInterval(poll, 2000);
-```
-- For large batches (100+ keywords), each poll returns the **entire results array** growing with each commit
-- No Server-Sent Events or WebSocket — purely HTTP polling
-- Poll does not stop if the tab loses focus
+### ✅ Resolved: Visibility-Aware Client Polling
+Polling in `App.tsx` now listens to `document.visibilitychange`. If the browser tab is hidden or minimized, polling halts to conserve network and CPU cycles, resuming immediately once the tab refocuses.
 
 ---
 
-### 🟡 Medium: `react-router-dom` is Installed but Not Used
+### 🟡 Open Architecture Considerations for Future Scaling
 
-`package.json` lists `react-router-dom ^7.18.3`, but `App.tsx` and `main.tsx` have no `<BrowserRouter>` or `useNavigate`. The entire UI is a **single-component state machine** using `activeView: 'new-scan' | 'history'` toggle. The router is dead weight for now.
-
----
-
-### 🟡 Medium: Export Files Accumulate Indefinitely
-
-Download endpoints write files to `exports/files/results_{job_id}.{fmt}`. There is **no cleanup mechanism** — these files grow forever. For 1000 jobs × 2 formats = 2000 files. Needs a TTL-based cleanup job or S3 pre-signed URLs for production.
-
----
-
-### 🟡 Medium: No Authentication
-
-The API is fully open. Any client on the network can:
-- Submit jobs (potential SerpApi credit drain)
-- Read any job's results by guessing/brute-forcing UUIDs
-- Download reports from any job
-
----
-
-### 🟡 Medium: Country/Language Hardcoded in Two Places
-
-The `COUNTRIES` and `LANGUAGES` dropdown lists in `App.tsx` (lines 37–43) must be manually kept in sync with `COUNTRY_MAP` and `LANGUAGE_MAP` in `serpapi_provider.py`. There is no single source of truth — if you add a country to the provider map, the UI won't show it unless you also update the React constants.
-
----
-
-### 🟢 Low: Keyword Dedup is In-Memory Only
-
-Deduplication uses a Python `set` during job creation. It correctly prevents duplicate `(keyword, country, language, device)` tuples within a **single upload**. However, there's no cross-job dedup — the same keyword can appear in multiple historical jobs (by design).
-
----
-
-### 🟢 Low: ETA Calculation is Approximate
+1. **Distributed Worker Queues (Celery / Redis / Temporal):**
+   `process_job()` runs in FastAPI's background threadpool. For large enterprise deployments with hundreds of concurrent users scanning 10,000+ keywords, offloading to external Celery or Temporal workers with Redis/RabbitMQ is recommended.
+2. **API Authentication & Rate Limiting:**
+   The current open-source self-hosted release does not enforce bearer token auth. If deployed publicly on the open web, add API key authentication or OAuth2 reverse proxy authentication to prevent unauthorized API credit consumption.
+3. **Automated Scheduled Scans:**
+   Automated daily or weekly rank check scheduling via APScheduler or cron is on the roadmap.
 
 ```typescript
 // App.tsx lines 321-325

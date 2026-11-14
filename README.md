@@ -82,8 +82,13 @@ Extract institutional-grade insights from every search response without extra AP
 ### 3. High-ROI "Opportunities" Vault
 Keywords ranking in positions **11–30** (Pages 2 & 3) represent the highest-ROI optimization targets. NexusRank isolates these near-miss keywords into a dedicated **Opportunities Vault** with live telemetry counters so SEO associates know exactly where to prioritize on-page tweaks and internal linking.
 
-### 4. Precision "Obsidian & Linear" UI (`frontend/src/`)
-- **Command Palette (`Cmd+K` / `Ctrl+K`):** Global modal to jump between historical scans, filter opportunities, trigger exports, and toggle themes.
+### 4. Human-Crafted SaaS Visual System & Interactive Guide (`frontend/src/`)
+- **`Inter` & `JetBrains Mono` Typography:** Crisp, human-crafted `Inter` UI typography with OpenType features (`cv02`, `cv03`, `cv04`, `cv11`). Strict `JetBrains Mono` (`tabular-nums`) styling reserved for numerical rankings, historical deltas, and URLs.
+- **True Neutral Zinc Palette:** Clean Light Mode (`#FAFAFA` page background, `#FFFFFF` cards, `#E4E4E7` borders) with a true-neutral Dark Mode toggle (`#09090B` Zinc-950 background, `#121215` cards, `#27272A` borders) and trustworthy Cobalt Blue (`#2563EB`) active accents. Zero neon glows or AI clutter.
+- **Dismissible 3-Step Interactive Welcome Guide:** Inline home screen checklist (`WelcomeGuideBanner.tsx`) that walks users through running a sample demo, filtering opportunities (11–30), and inspecting SERP X-Ray drawers, backed by persistent `localStorage` progress tracking.
+- **Built-In Help & Documentation Center:** Dedicated in-app documentation view (`HelpView.tsx`) featuring real-time search, plain-English glossary cards, search engines comparison table, and a 1-click sample CSV download.
+- **Contextual Metric Tooltips:** Accessible `<InfoTooltip />` popover triggers providing 1–2 sentence definitions directly beside core metrics.
+- **Command Palette (`Cmd+K` / `Ctrl+K`):** Global modal to jump between historical scans, filter opportunities, open documentation, trigger exports, and toggle themes.
 - **Client-Side CSV Previews:** Drag-and-drop file uploader that parses CSV headers and counts keywords in the browser before transmission.
 - **1-Click Instant Demos:** Pre-populated presets for `GitHub.com` (software queries) and `Wikipedia.org` (encyclopedic head terms) that create in-memory CSV files for zero-setup evaluation.
 - **Visibility-Aware Polling:** Live 2-second background task polling pauses automatically when the browser tab is hidden (`document.hidden`) and resumes immediately upon refocus.
@@ -103,9 +108,11 @@ Keywords ranking in positions **11–30** (Pages 2 & 3) represent the highest-RO
 flowchart TB
     subgraph ClientLayer ["Client Layer · React 19 SPA (Vite :5173)"]
         UI_Launch["ScanLaunchpad.tsx\n• Client-side CSV Preview\n• 1-Click Demo Presets\n• Engine Selector"]
-        UI_Bento["BentoAnalyticsHeader.tsx\n• Organic Visibility Gauge\n• 5-Tier Distribution Bar\n• Competitor Summary"]
+        UI_Onboarding["WelcomeGuideBanner.tsx\n• 3-Step Interactive Walkthrough\n• localStorage Progress Tracking"]
+        UI_Bento["BentoAnalyticsHeader.tsx\n• Organic Visibility Gauge\n• 5-Tier Distribution Bar\n• InfoTooltip Metric Popovers"]
         UI_Grid["ResultsDataGrid.tsx\n• Smart Filters (11-30 Opps)\n• SERP X-Ray Drawer\n• AI Action Brief Prompt"]
-        UI_Palette["CommandPalette.tsx\n• Cmd+K / Ctrl+K Modal\n• History & Theme Controls"]
+        UI_Help["HelpView.tsx\n• Built-In SEO Glossary\n• Search Engine Comparison\n• Sample CSV Downloader"]
+        UI_Palette["CommandPalette.tsx\n• Cmd+K / Ctrl+K Modal\n• History, Doc & Theme Controls"]
     end
 
     subgraph APILayer ["API Gateway Layer · FastAPI (Uvicorn :8000)"]
@@ -476,21 +483,28 @@ keyword-rank-tracker/
 │   │   │   └── client.ts            # Typed Axios client service
 │   │   ├── components/
 │   │   │   ├── common/
-│   │   │   │   └── CommandPalette.tsx # Global Cmd+K / Ctrl+K search & shortcut modal
+│   │   │   │   ├── CommandPalette.tsx # Global Cmd+K / Ctrl+K search & shortcut modal
+│   │   │   │   └── InfoTooltip.tsx    # Contextual popover tooltip component for metrics
+│   │   │   ├── help/
+│   │   │   │   └── HelpView.tsx       # Built-in Help & Glossary center with sample CSV download
 │   │   │   ├── history/
 │   │   │   │   └── HistoryView.tsx    # Searchable scan archive with status badges & deletion
 │   │   │   ├── layout/
-│   │   │   │   └── AppShell.tsx       # Collapsible navigation, engine status, and theme toggle
+│   │   │   │   └── AppShell.tsx       # Clean 240px navigation, engine status, and theme toggle
+│   │   │   ├── onboarding/
+│   │   │   │   └── WelcomeGuideBanner.tsx # Dismissible 3-step interactive onboarding card
 │   │   │   ├── results/
 │   │   │   │   ├── BentoAnalyticsHeader.tsx # Organic Visibility SoV gauge & 5-tier cards
 │   │   │   │   ├── CompetitorMatrixView.tsx # Page 1 Competitor domain cross-reference
 │   │   │   │   └── ResultsDataGrid.tsx      # Table, smart filters, and SERP X-Ray drawer
 │   │   │   └── scan/
-│   │   │       └── ScanLaunchpad.tsx  # Drag & drop upload, client preview & 1-click demos
+│   │   │       └── ScanLaunchpad.tsx  # Centered form, drag & drop upload & 1-click demos
+│   │   ├── hooks/
+│   │   │   └── useOnboarding.ts       # Persistent localStorage interactive walkthrough state
 │   │   ├── types/
-│   │   │   └── index.ts             # TypeScript definitions for jobs, tasks, and telemetry
+│   │   │   └── index.ts             # TypeScript definitions for jobs, tasks, views, and telemetry
 │   │   ├── App.tsx                  # Root application orchestrator with visibility-aware polling
-│   │   ├── index.css                # Obsidian theme variables, tabular numbers, animations
+│   │   ├── index.css                # Inter & JetBrains Mono typography, true neutral Zinc tokens
 │   │   └── main.tsx                 # React 19 application entrypoint
 │   ├── Dockerfile                   # Frontend multi-stage build container
 │   ├── nginx.conf                   # Nginx reverse proxy configuration for Docker
