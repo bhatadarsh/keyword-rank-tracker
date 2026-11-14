@@ -7,7 +7,24 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ## 2026-11-14
 
-### Version 2.0 — Open-Source Zero-Cost SEO & SERP Intelligence Platform
+### Version 2.0.1 — Cross-Platform Launchers & Universal Onboarding Guide
+
+**[FEAT]** **Zero-Config Cross-Platform Dev Launchers**:
+- Updated `start.ps1` (Windows): automatically copies `.env.example`, auto-creates `backend/venv`, auto-installs `requirements.txt` and `node_modules`, kills stale port listeners, starts backend and frontend in separate consoles, and opens the default browser to `http://localhost:5173`.
+- Added `start.sh` (macOS / Linux): POSIX-compliant shell script with prerequisites validation, auto-environment setup, parallel background process execution, and automated `SIGINT`/`SIGTERM` cleanup traps (`Ctrl+C` cleanly shuts down all processes).
+
+**[DOCS]** **Exhaustive "How to Run This Project" Guide (`README.md`)**:
+- Added foolproof step-by-step onboarding documentation covering 1-Click Windows execution, macOS/Linux execution, Docker Compose (`docker compose up --build`), and granular terminal-by-terminal manual workflows.
+- Included pre-flight checklist, ports reference, sample dataset guides (`test_github.csv`, `test_wikipedia.csv`), and common troubleshooting scenarios (port conflicts, PowerShell policies, Docker daemon).
+
+**[CHORE]** **Dependency Manifest & Configuration Hardening**:
+- Pinned `pydantic==2.13.5` explicitly in `backend/requirements.txt` alongside `fastapi==0.115.12`, `uvicorn==0.34.3`, and `sqlalchemy==2.0.40`.
+- Verified all 33 pytest unit and integration tests passing in <1s.
+- Verified 0 oxlint warnings and 0 errors across all frontend TypeScript files.
+
+---
+
+### Version 2.0.0 — Open-Source Zero-Cost SEO & SERP Intelligence Platform
 
 **[FEAT]** **100% Zero-Cost Multi-Engine SERP Architecture (`backend/providers/`)**:
 - Added `FreeSerpProvider` (`backend/providers/free_serp_provider.py`) enabling zero-key live search via DuckDuckGo Lite and SearXNG with User-Agent rotation and graceful fallback.

@@ -33,6 +33,7 @@
 | `python-multipart` | `0.0.20` | FastAPI file upload support |
 | `httpx` | `0.28.1` | Sync HTTP client for SerpApi calls |
 | `python-dotenv` | `1.0.1` | `.env` file loading |
+| `pydantic` | `2.13.5` | Data validation and schema settings |
 | `pytest` | `8.3.5` | Test runner |
 | `pytest-asyncio` | `0.25.3` | Async test support |
 

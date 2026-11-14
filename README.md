@@ -6,13 +6,13 @@
 **Automated Rank Tracking · Competitor Share-of-Voice · Cannibalization Audits · SERP X-Ray**
 
 <p align="center">
-  <a href="#-1-command-quickstart">Quickstart</a> •
+  <a href="#-how-to-run-this-project">How to Run</a> •
   <a href="#-system-architecture--data-flow">Architecture</a> •
   <a href="#-core-capabilities--zero-cost-intelligence-engine">Features</a> •
   <a href="#-configuration-csv-format--api-reference">Configuration</a> •
   <a href="#-rest-api-reference">API Docs</a> •
   <a href="#-testing--verification">Tests</a> •
-  <a href="#-open-source-roadmap--contributing">Roadmap</a>
+  <a href="#-troubleshooting--frequently-asked-questions">Troubleshooting</a>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
@@ -203,76 +203,183 @@ sequenceDiagram
 
 ---
 
-## ⚡ 1-Command Quickstart
+## 🚀 How to Run This Project
 
-### Option 1: Docker Compose (Zero Local Dependencies)
+NexusRank is designed for zero-friction onboarding. Whether you prefer a single-click script, a containerized Docker setup, or manual granular control, follow the method that matches your environment.
 
-The fastest way to spin up NexusRank on any OS:
+### 📋 Prerequisites Checklist
+
+Before running locally without Docker, ensure you have:
+- **Python 3.11, 3.12, or 3.13** installed (`python --version` or `python3 --version`)
+- **Node.js 18, 20, or 22** + **npm** installed (`node --version` and `npm --version`)
+- *(Optional)* **Docker & Docker Compose** (if using containerized execution)
+
+---
+
+### Method 1: Windows 1-Click Automated Launcher (Recommended for Windows)
+
+NexusRank includes an intelligent PowerShell launcher (`start.ps1`) that handles the entire setup lifecycle automatically:
+
+1. Open PowerShell and navigate to the project directory:
+   ```powershell
+   cd "keyword-rank-tracker"
+   ```
+2. Run the launcher script:
+   ```powershell
+   .\start.ps1
+   ```
+
+**What the script does automatically:**
+- Copies `.env.example` to `.env` (backend & root) if missing.
+- Checks if ports `8000` or `5173` are occupied and cleanly terminates zombie processes.
+- Creates `backend/venv` and installs all dependencies from `requirements.txt` if not present.
+- Runs `npm install` inside `frontend/` if `node_modules` is missing.
+- Spawns the FastAPI backend (`http://localhost:8000`) and Vite frontend (`http://localhost:5173`) in independent terminal consoles.
+- Automatically launches your default web browser to [http://localhost:5173](http://localhost:5173).
+
+> [!TIP]
+> If Windows blocks script execution with an `ExecutionPolicy` error, run:
+> ```powershell
+> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+> .\start.ps1
+> ```
+
+---
+
+### Method 2: macOS & Linux 1-Script Launcher (Recommended for Unix)
+
+We provide a POSIX shell script (`start.sh`) with auto-environment configuration and graceful shutdown hooks:
+
+1. Open your terminal and navigate to the project root:
+   ```bash
+   cd keyword-rank-tracker
+   ```
+2. Grant execution permissions and run:
+   ```bash
+   chmod +x start.sh
+   ./start.sh
+   ```
+
+**What the script does automatically:**
+- Validates that `python3` and `npm` are installed.
+- Provisions `.env` from `.env.example`.
+- Builds the `backend/venv` virtual environment and installs pinned dependencies.
+- Runs `npm install` inside `frontend/` if dependencies aren't built.
+- Starts both servers concurrently in the background.
+- Captures `SIGINT` / `SIGTERM` — pressing `Ctrl+C` cleanly shuts down both background processes without leaving orphaned ports.
+
+---
+
+### Method 3: Docker & Docker Compose (Zero Local Dependencies)
+
+Run the entire platform inside isolated, multi-stage production containers with zero host dependencies installed:
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/keyword-rank-tracker.git
 cd keyword-rank-tracker
 
-# Start backend and frontend containers
+# Build and start all services
 docker compose up --build
 ```
 
-- **Frontend Application:** [http://localhost:5173](http://localhost:5173)
-- **FastAPI Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **API Health Endpoint:** [http://localhost:8000/health](http://localhost:8000/health)
+- **Run in the background (detached daemon):**
+  ```bash
+  docker compose up -d
+  ```
+- **View live streaming container logs:**
+  ```bash
+  docker compose logs -f
+  ```
+- **Stop all services:**
+  ```bash
+  docker compose down
+  ```
 
 ---
 
-### Option 2: Windows 1-Click Dev Launcher
+### Method 4: Manual Step-by-Step Local Setup
 
-NexusRank ships with an automated PowerShell pre-flight launcher:
+If you prefer to start each service in separate terminal windows:
 
-```powershell
-# From the repository root
-.\start.ps1
-```
+#### Step 1: Backend Setup (FastAPI)
 
-The script automatically:
-1. Checks and cleans orphaned processes holding ports `8000` and `5173`.
-2. Validates the Python virtual environment and frontend `node_modules`.
-3. Spawns FastAPI and Vite in separate terminal sessions and launches your default browser.
+1. Open Terminal 1 and enter the backend directory:
+   ```bash
+   cd keyword-rank-tracker/backend
+   ```
+2. Create and activate a Python virtual environment:
+   - **Windows (PowerShell):**
+     ```powershell
+     python -m venv venv
+     .\venv\Scripts\activate
+     ```
+   - **macOS / Linux:**
+     ```bash
+     python3 -m venv venv
+     source venv/bin/activate
+     ```
+3. Upgrade `pip` and install dependencies:
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+4. Initialize the environment file:
+   ```bash
+   # Windows PowerShell:
+   Copy-Item ../.env.example .env
+
+   # macOS / Linux:
+   cp ../.env.example .env
+   ```
+5. Start the FastAPI development server:
+   ```bash
+   python -m uvicorn main:app --reload --port 8000
+   ```
+   *The backend will automatically create and migrate `rank_tracker.db` on startup.*
+
+#### Step 2: Frontend Setup (React 19 + Vite)
+
+1. Open Terminal 2 and enter the frontend directory:
+   ```bash
+   cd keyword-rank-tracker/frontend
+   ```
+2. Install Node dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the Vite development server:
+   ```bash
+   npm run dev
+   ```
+4. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-### Option 3: Manual Local Setup (macOS / Linux / Windows)
+### 🌐 Service Verification & Health Checks
 
-#### Step 1: Backend Setup
-```bash
-cd backend
+Once running, verify each endpoint:
 
-# Create and activate virtual environment
-python -m venv venv
-# On Windows: .\venv\Scripts\activate
-# On macOS/Linux: source venv/bin/activate
+| Interface | URL | Health Expectation |
+|---|---|---|
+| **Web Dashboard** | [http://localhost:5173](http://localhost:5173) | Obsidian Dark Theme interface loads with Scan Launchpad |
+| **Backend Health** | [http://localhost:8000/health](http://localhost:8000/health) | Returns `{"status":"ok","platform":"NexusRank","version":"2.0.0"}` |
+| **Config Endpoint** | [http://localhost:8000/api/config](http://localhost:8000/api/config) | Returns available providers (`free`, `mock`, `serpapi`) |
+| **Interactive Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | OpenAPI Swagger UI to execute API calls |
 
-# Install pinned dependencies
-pip install -r requirements.txt
+---
 
-# Create .env from template (or use root .env)
-cp ../.env.example .env
+### ⚡ Running Your First Scan in 30 Seconds
 
-# Start FastAPI server
-uvicorn main:app --reload --port 8000
-```
-
-#### Step 2: Frontend Setup
-```bash
-cd frontend
-
-# Install Node dependencies
-npm install
-
-# Run Vite dev server
-npm run dev
-```
-
-Visit [http://localhost:5173](http://localhost:5173) to start scanning!
+1. Open **[http://localhost:5173](http://localhost:5173)** in your browser.
+2. In the **Scan Launchpad**, try one of the **1-Click Demo Presets**:
+   - Click **`⚡ GitHub.com`** (loads developer search keywords: `git repository`, `code review tool`, `devops pipeline`, etc.)
+   - Click **`📚 Wikipedia.org`** (loads general knowledge head terms: `artificial intelligence`, `quantum computing`, etc.)
+3. Choose your SERP Engine:
+   - **`Free Live Search`**: 100% zero-cost live web queries via DuckDuckGo Lite & SearXNG (no API keys required).
+   - **`Domain Simulator`**: Fast deterministic mock engine with reproducible positions and simulated competitor pool.
+4. Click **"Start Rank Scan"**.
+5. Observe the live **Bento Analytics Header**, **Organic Visibility Index (SoV %)**, **Striking-Distance Opportunities (11–30)** tab, and click any row to open the **SERP X-Ray Drawer**!
 
 ---
 
@@ -397,6 +504,7 @@ keyword-rank-tracker/
 ├── docker-compose.yml               # Multi-container orchestration (Backend + Frontend)
 ├── sample_keywords.csv              # General sample keywords dataset
 ├── start.ps1                        # Windows 1-click dev launcher script
+├── start.sh                         # macOS/Linux 1-script dev launcher
 ├── test_github.csv                  # Integration test keywords for GitHub.com
 └── test_wikipedia.csv               # Integration test keywords for Wikipedia.org
 ```
@@ -421,6 +529,41 @@ npm run build
 ```
 
 **Continuous Integration:** Every commit and pull request triggers `.github/workflows/ci.yml`, running the full pytest suite on Python 3.11 and validating `npm run lint` and `npm run build` on Node 20.
+
+---
+
+## 🛠️ Troubleshooting & Frequently Asked Questions
+
+### Q: Port 8000 or 5173 is already in use
+**Solution:**
+- If you used `start.ps1`, it automatically kills stale processes on those ports.
+- Alternatively, find and stop the process manually:
+  - **Windows (PowerShell):**
+    ```powershell
+    Get-NetTCPConnection -LocalPort 8000, 5173 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+    ```
+  - **macOS / Linux:**
+    ```bash
+    kill -9 $(lsof -ti :8000) 2>/dev/null || true
+    kill -9 $(lsof -ti :5173) 2>/dev/null || true
+    ```
+
+### Q: PowerShell blocks `start.ps1` with `ExecutionPolicy` error
+**Solution:**
+Windows restricts execution of unsigned scripts by default. Run:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\start.ps1
+```
+*(This bypasses the policy only for the current terminal session without changing system-wide security settings).*
+
+### Q: Do I need a SerpApi API key to use NexusRank?
+**Answer:**
+**No.** NexusRank defaults to `SERP_PROVIDER=free`, which uses our zero-key `FreeSerpProvider` (querying DuckDuckGo Lite and SearXNG with smart User-Agent rotation). You also have access to `mock` for deterministic domain simulations. You only need a SerpApi key if you explicitly choose the `serpapi` engine.
+
+### Q: How do I reset or clean my database?
+**Solution:**
+Delete the SQLite file `backend/rank_tracker.db`. The application will automatically recreate the database and all tables with updated schema upon the next startup.
 
 ---
 
