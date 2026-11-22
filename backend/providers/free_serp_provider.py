@@ -88,7 +88,8 @@ class FreeSerpProvider(SerpProvider):
     Gracefully falls back to high-fidelity mock if network blocked or rate-limited.
     """
 
-    def __init__(self):
+    def __init__(self, allow_fallback: bool = False):
+        self.allow_fallback = allow_fallback
         self.searxng_url = os.getenv("SEARXNG_URL", "").strip()
         self.mock_fallback = MockProvider()
 
@@ -118,7 +119,11 @@ class FreeSerpProvider(SerpProvider):
             return ddg_resp
 
         # 3. Fallback to dynamic domain simulation if network blocks or rate limits
-        logger.warning("Free live search returned no results (rate-limit or network barrier). Engaging smart fallback.")
+        reason = "Live search returned no usable results; the service may be unavailable or rate-limited."
+        if not self.allow_fallback:
+            return SearchResponse(keyword=keyword, results=[], status="api_error", error=reason,
+                                  actual_provider="free")
+        logger.warning("%s Using explicitly enabled simulation fallback.", reason)
         fallback = self.mock_fallback.search(
             keyword=keyword,
             country=country,
@@ -127,7 +132,7 @@ class FreeSerpProvider(SerpProvider):
             depth=depth,
             target_domain=target_domain,
         )
-        return fallback
+        return fallback.model_copy(update={"fallback_used": True, "fallback_reason": reason})
 
     def _query_searxng(self, keyword: str, depth: int) -> Optional[SearchResponse]:
         try:
@@ -154,7 +159,8 @@ class FreeSerpProvider(SerpProvider):
                             )
                         )
                     if results:
-                        return SearchResponse(keyword=keyword, results=results, status="success")
+                        return SearchResponse(keyword=keyword, results=results, status="success",
+                                              actual_provider="searxng", coverage_complete=False)
         except Exception as exc:
             logger.debug("SearXNG query failed: %s", exc)
         return None
@@ -196,7 +202,8 @@ class FreeSerpProvider(SerpProvider):
                     )
 
                 logger.info("DuckDuckGo Lite returned %d organic results for %r", len(results), keyword)
-                return SearchResponse(keyword=keyword, results=results, status="success")
+                return SearchResponse(keyword=keyword, results=results, status="success",
+                                      actual_provider="duckduckgo", coverage_complete=False)
         except Exception as exc:
             logger.debug("DuckDuckGo Lite fetch failed: %s", exc)
             return None

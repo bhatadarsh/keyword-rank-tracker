@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 # Load .env FIRST before anything else imports os.getenv
@@ -10,19 +11,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router, config_router
 from database import engine, Base, ensure_schema_columns, reconcile_orphan_jobs
 
-# 1. Ensure all core tables are created
-Base.metadata.create_all(bind=engine)
-
-# 2. Seamless auto-migration: dynamically add any new columns to existing SQLite/Postgres DBs
-ensure_schema_columns()
-
-# 3. Crash recovery: Reconcile any orphan/stuck jobs from previous server crash
-reconcile_orphan_jobs()
-
-# 4. Ensure export file directory exists
-os.makedirs(os.path.join(os.getcwd(), "exports", "files"), exist_ok=True)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Single instance owns background jobs. Never run recovery on import.
+    Base.metadata.create_all(bind=engine)
+    ensure_schema_columns()
+    reconcile_orphan_jobs()
+    os.makedirs(os.getenv("EXPORT_DIR", os.path.join(os.getcwd(), "exports", "files")), exist_ok=True)
+    yield
 
 app = FastAPI(
+    lifespan=lifespan,
     title="NexusRank — Zero-Cost SEO & SERP Intelligence Platform",
     description="Flagship open-source SEO suite with multi-engine SERP tracking, rank delta history, visibility scoring, and cannibalization detection.",
     version="2.0.0",
@@ -33,14 +32,9 @@ app = FastAPI(
 # Enable CORS for development and production web clients
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:80",
-        "*"
-    ],
+    allow_origins=[origin.strip() for origin in os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost"
+    ).split(",") if origin.strip() and origin.strip() != "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

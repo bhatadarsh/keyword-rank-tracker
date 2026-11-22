@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from database import Base
 
 
@@ -9,6 +9,7 @@ class JobStatus(str, enum.Enum):
     queued = "queued"
     processing = "processing"
     completed = "completed"
+    completed_with_errors = "completed_with_errors"
     failed = "failed"
 
 
@@ -20,6 +21,7 @@ class KeywordStatus(str, enum.Enum):
     rate_limited = "rate_limited"
     timeout = "timeout"
     invalid = "invalid"
+    incomplete = "incomplete"
 
 
 class Job(Base):
@@ -27,7 +29,7 @@ class Job(Base):
 
     id = Column(String, primary_key=True, index=True)
     status = Column(String, default=JobStatus.queued.value, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
 
     company_name = Column(String, nullable=False)
     domain = Column(String, nullable=False)
@@ -40,6 +42,12 @@ class Job(Base):
     provider = Column(String, default="mock", nullable=True)
     visibility_score = Column(Float, nullable=True)  # CTR-weighted organic visibility (0-100%)
     top_competitors_summary = Column(Text, nullable=True)  # JSON summary of top 5 competitor domains
+    actual_provider = Column(String, default="unknown")
+    allow_fallback = Column(Boolean, default=False, nullable=False)
+    fallback_used = Column(Boolean, default=False, nullable=True)
+    fallback_reason = Column(Text)
+    error_message = Column(Text)
+    metrics_sample_size = Column(Integer, default=0)
 
     tasks = relationship("KeywordTask", back_populates="job", cascade="all, delete-orphan")
 
@@ -72,6 +80,19 @@ class KeywordTask(Base):
 
     # Top 5 SERP competitors snapshot JSON for X-Ray inspection
     top_competitors_json = Column(Text, nullable=True)
+    page_1_competitors_json = Column(Text, nullable=True)
+    actual_provider = Column(String, default="unknown")
+    fallback_used = Column(Boolean, default=False, nullable=True)
+    fallback_reason = Column(Text)
+    observed_at = Column(DateTime)
+    results_examined = Column(Integer, default=0)
+    coverage_complete = Column(Boolean, nullable=True)
+    effective_country = Column(String)
+    effective_language = Column(String)
+    effective_device = Column(String)
+    error_message = Column(Text)
+    previous_status = Column(String)
+    comparison_status = Column(String, default="unavailable")
 
     status = Column(String, default=KeywordStatus.pending.value, nullable=False)
 

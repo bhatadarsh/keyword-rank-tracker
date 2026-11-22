@@ -9,9 +9,10 @@ import type { HistoryJob } from '../../types';
 interface HistoryViewProps {
   onLoadJob: (jobId: string) => void;
   onAddToast: (type: 'success' | 'error' | 'info' | 'warning', msg: string) => void;
+  onDeleted: () => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ onLoadJob, onAddToast }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ onLoadJob, onAddToast, onDeleted }) => {
   const [jobs, setJobs] = useState<HistoryJob[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
@@ -59,6 +60,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onLoadJob, onAddToast 
     try {
       await apiClient.deleteJob(jobId);
       setJobs((prev) => prev.filter((j) => j.job_id !== jobId));
+      onDeleted();
       onAddToast('info', 'Scan deleted from history.');
     } catch {
       onAddToast('error', 'Could not delete scan.');
@@ -167,10 +169,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onLoadJob, onAddToast 
                       <span>Keywords: <span className="font-mono font-medium text-zinc-700 dark:text-zinc-300">{job.found_count}/{job.keyword_count}</span></span>
                       {isCompleted && (
                         <span className="text-blue-600 dark:text-blue-400 font-medium font-mono">
-                          SoV: {job.visibility_score.toFixed(1)}%
+                          Visibility: {job.visibility_score === null ? 'Unavailable' : job.visibility_score.toFixed(1) + '%'}
                         </span>
                       )}
                     </div>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-1">
+                      Source: {job.actual_provider}{job.fallback_used ? ' · Simulation fallback: ' + job.fallback_count + ' keywords' : ''}
+                      {job.actual_provider === 'unknown' ? ' · Source not yet recorded or unavailable' : ''}
+                    </p>
                   </div>
                 </div>
 
@@ -187,7 +193,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onLoadJob, onAddToast 
                   <button
                     type="button"
                     onClick={(e) => handleDelete(e, job.job_id)}
-                    disabled={deletingId === job.job_id}
+                    disabled={deletingId === job.job_id || job.status === 'queued' || job.status === 'processing'}
                     title="Delete scan from history"
                     className="p-2 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
                   >

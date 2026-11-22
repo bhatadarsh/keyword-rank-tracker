@@ -6,7 +6,8 @@ import type { Result, TopCompetitorSummary } from '../../types';
 interface BentoAnalyticsHeaderProps {
   results: Result[];
   totalKeywords: number;
-  visibilityScore: number;
+  visibilityScore: number | null;
+  metricsSampleSize: number;
   topCompetitors: TopCompetitorSummary[];
   cannibalizedCount: number;
   onFilterClick?: (filterKey: string) => void;
@@ -16,6 +17,7 @@ export const BentoAnalyticsHeader: React.FC<BentoAnalyticsHeaderProps> = ({
   results,
   totalKeywords,
   visibilityScore,
+  metricsSampleSize,
   cannibalizedCount,
   onFilterClick,
 }) => {
@@ -41,25 +43,25 @@ export const BentoAnalyticsHeader: React.FC<BentoAnalyticsHeaderProps> = ({
               Visibility Score
               <InfoTooltip
                 title="Organic Visibility Index"
-                content="A 0–100% CTR-weighted Share of Voice score. Rank #1 gets 30 pts, #2 gets 18 pts, down to #11–30 getting 1 pt."
+                content="A modeled rank score, not measured traffic or market share. Uses complete observations from one source; request failures and partial coverage are excluded."
               />
             </span>
-            <span className="text-[11px] font-medium text-zinc-400 font-mono">SoV %</span>
+            <span className="text-[11px] font-medium text-zinc-400 font-mono">Index %</span>
           </div>
 
           <div className="my-3">
             <div className="text-2xl font-bold font-mono tracking-tight text-zinc-900 dark:text-zinc-100">
-              {visibilityScore.toFixed(1)}%
+              {visibilityScore === null ? '—' : visibilityScore.toFixed(1) + '%'}
             </div>
             <p className="text-[11px] text-zinc-400 mt-0.5">
-              Organic CTR probability across batch
+              {visibilityScore === null ? 'Complete, comparable coverage unavailable' : 'Based on ' + metricsSampleSize + ' complete observations'}
             </p>
           </div>
 
           <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
             <div
               className="bg-blue-600 h-full rounded-full transition-all duration-700"
-              style={{ width: `${Math.min(100, visibilityScore * 2.5)}%` }}
+              style={{ width: `${visibilityScore ?? 0}%` }}
             />
           </div>
         </div>
@@ -165,7 +167,7 @@ export const BentoAnalyticsHeader: React.FC<BentoAnalyticsHeaderProps> = ({
           <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${cannibalizedCount > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`}
-              style={{ width: cannibalizedCount > 0 ? '100%' : '100%' }}
+              style={{ width: `${(cannibalizedCount / validTotal) * 100}%` }}
             />
           </div>
         </div>

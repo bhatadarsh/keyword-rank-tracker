@@ -5,6 +5,53 @@ Format: `[TYPE] Description` where TYPE is **FEAT / FIX / REFACTOR / DOCS / TEST
 
 ---
 
+## 2026-11-22
+
+### Wave 1 (P0) — Ranking Trust, Routing & Stability
+
+**[FEAT]** **Source and fallback provenance**:
+
+- Added per-task/job `actual_provider`, `fallback_used`, and `fallback_reason`, with observation time, results examined, effective settings, and coverage on tasks.
+- Free search simulation fallback is off by default and requires an explicit per-scan option. Persistent UI disclosures distinguish synthetic results and partial coverage from verified live rankings.
+- CSV/XLSX exports include task/job provenance, coverage, comparison state, and error details. Legacy observations retain unknown provenance rather than being relabeled live.
+
+**[FIX]** **Comparable history and accurate analytics**:
+
+- Rank movement requires earlier completed observations with compatible provider, source, settings, depth, fallback usage, and complete coverage. First observations, newly found rankings, dropped rankings, and unavailable comparisons are distinct.
+- Competitor coverage counts a domain once per keyword and uses actual ranks 1–10. The comparison table excludes the target from its selected competitor and no longer silently truncates at 15 keywords.
+- Visibility is described as a modeled rank score, not measured traffic or market share. Incomplete observations and request failures are excluded; mixed sources have no combined score. Metric bars now use proportional widths.
+- Added `completed_with_errors`, incomplete-coverage task states, an Errors / incomplete filter, and actionable failure messages. Fatal failures settle remaining pending tasks; running scans cannot be deleted.
+
+**[FEAT]** **URL navigation and request recovery**:
+
+- Wired `/`, `/scans/:jobId`, `/competitors?jobId=…`, `/history`, and `/help`. Search, filter, and sort parameters survive refresh and browser navigation.
+- Replaced the root polling loop with a job-scoped hook that cancels obsolete requests, avoids overlapping polls, pauses while hidden, and ignores stale responses. Deleted/missing scans clear cached results and expose recovery actions.
+- Added a root Error Boundary, validated onboarding storage, guarded theme storage, class-based Tailwind v4 dark styles, and pre-paint theme initialization.
+- Submission failures preserve inputs and display API validation messages; created jobs navigate immediately using the returned ID. Provider configuration controls availability and supported settings.
+
+**[FIX]** **Bounded CSV/XLSX ingestion**:
+
+- Added a shared [upload parser](./backend/services/ingestion.py) and `POST /api/rank-check/preview`, replacing format-blind client parsing with server validation off the event loop.
+- Enforced 5 MiB uploads, 2,000 data rows, 20 columns, 500-character keywords, and a 50 MiB expanded-workbook limit. Preserved UTF-8 BOM, quoted/multiline CSV fields, literal NA values, leading zeros in text keywords, blank-row reporting, and deduplication.
+- Validated per-row locale/device overrides. Rejected legacy `.xls` with a clear `.xlsx`/`.csv` conversion message; no legacy reader dependency was added.
+
+**[REFACTOR]** **Local-first startup and test isolation**:
+
+- Moved schema creation, additive migration, and interrupted-job reconciliation into FastAPI lifespan. Migration failures abort startup visibly; importing the application no longer initializes or repairs a database.
+- Kept recovery single-instance, without distributed leases or heartbeat infrastructure. Pending-task recovery is scoped to interrupted jobs.
+- Added disposable SQLite/export fixtures for pytest and explicit test provider settings. Removed wildcard CORS in favor of configurable `CORS_ORIGINS` with localhost defaults; authentication remains out of scope.
+
+**[TEST]** **Wave 1 verification**:
+
+- Isolated backend suite: **93 passed** (original 33 plus 60 new cases).
+- `npm run lint` and `npm run build`: passed with **0 errors and 0 warnings**. Editor diagnostics and `git diff --check` were clean.
+- Browser checks covered scan refresh, URL filters, Back navigation, New Scan, stale-response cancellation, theme overrides, corrupt onboarding recovery, CSV/XLSX preview/submission, validation errors, fallback disclosure, missing routes/scans, and Error Boundary recovery.
+- Upstream provider failures were mocked. Browser scans used a temporary database; the existing application database's SHA-256 remained unchanged.
+
+**[DOCS]** Updated the [README](./README.md) to reflect implemented behavior, setup, limits, source/coverage semantics, test isolation, and queued waves. Wave 2 has not started; UI redesign, keyboard overhaul, SSE, cancel/retry, and re-run actions remain queued.
+
+---
+
 ## 2026-11-14
 
 ### Version 2.1.0 — Human-Crafted SaaS Redesign & Built-In Help Center

@@ -112,7 +112,7 @@ class SerpApiProvider(SerpProvider):
     """
 
     def __init__(self):
-        self.api_key = os.getenv("SERP_API_KEY")
+        self.api_key = os.getenv("SERP_API_KEY", "").strip()
         self.base_url = "https://serpapi.com/search"
 
         if not self.api_key:
@@ -148,6 +148,7 @@ class SerpApiProvider(SerpProvider):
 
         max_pages = max(1, math.ceil(depth / 100))
         all_results = []
+        partial_error = None
 
         try:
             with httpx.Client(timeout=35.0) as client:
@@ -187,6 +188,7 @@ class SerpApiProvider(SerpProvider):
                                 error=data["error"],
                                 status="api_error",
                             )
+                        partial_error = "Search stopped before the requested depth because the provider returned an error."
                         break
 
                     organic_results = data.get("organic_results", [])
@@ -211,7 +213,10 @@ class SerpApiProvider(SerpProvider):
                         break
 
             logger.info("SerpApi collected %d total results for %r", len(all_results), keyword)
-            return SearchResponse(keyword=keyword, results=all_results, status="success")
+            return SearchResponse(keyword=keyword, results=all_results, status="success",
+                                  actual_provider="serpapi", error=partial_error,
+                                  coverage_complete=not partial_error and len(all_results) >= depth,
+                                  effective_country=country, effective_language=language, effective_device=device)
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
@@ -224,15 +229,15 @@ class SerpApiProvider(SerpProvider):
                 )
             logger.error("HTTP error from SerpApi: %s", e)
             return SearchResponse(
-                keyword=keyword, results=all_results, error=str(e), status="api_error"
+                keyword=keyword, results=all_results, error="Search provider returned an HTTP error.", status="api_error"
             )
         except httpx.TimeoutException as e:
             logger.error("Timeout reaching SerpApi for keyword %r: %s", keyword, e)
             return SearchResponse(
-                keyword=keyword, results=all_results, error=str(e), status="timeout"
+                keyword=keyword, results=all_results, error="Search provider timed out.", status="timeout"
             )
         except httpx.RequestError as e:
             logger.error("Request error for keyword %r: %s", keyword, e)
             return SearchResponse(
-                keyword=keyword, results=all_results, error=str(e), status="api_error"
+                keyword=keyword, results=all_results, error="Could not connect to the search provider.", status="api_error"
             )

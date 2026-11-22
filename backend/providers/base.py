@@ -15,6 +15,13 @@ class SearchResponse(BaseModel):
     results: List[SearchResult]
     error: Optional[str] = None
     status: str = "success"  # "success" | "api_error" | "rate_limited" | "timeout"
+    actual_provider: str = "unknown"
+    fallback_used: bool = False
+    fallback_reason: Optional[str] = None
+    coverage_complete: bool = False
+    effective_country: Optional[str] = None
+    effective_language: Optional[str] = None
+    effective_device: Optional[str] = None
 
 
 class SerpProvider(ABC):

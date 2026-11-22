@@ -9,7 +9,7 @@ from providers.free_serp_provider import FreeSerpProvider
 logger = logging.getLogger(__name__)
 
 
-def get_provider(provider_name: Optional[str] = None) -> SerpProvider:
+def get_provider(provider_name: Optional[str] = None, allow_fallback: bool = False) -> SerpProvider:
     """
     Factory function returning the selected SERP provider instance.
 
@@ -26,11 +26,10 @@ def get_provider(provider_name: Optional[str] = None) -> SerpProvider:
 
     if name in ("free", "duckduckgo", "searxng"):
         logger.info("Engaging FreeSerpProvider (zero-cost live search)")
-        return FreeSerpProvider()
+        return FreeSerpProvider(allow_fallback=allow_fallback)
 
     if name == "mock":
         logger.info("Engaging MockProvider (smart deterministic simulation)")
         return MockProvider()
 
-    logger.warning("Unknown provider %r — falling back to MockProvider.", name)
-    return MockProvider()
+    raise ValueError(f"Unknown search provider: {name}")

@@ -61,12 +61,12 @@ export const HelpView: React.FC<HelpViewProps> = ({
     },
     {
       id: 'visibility',
-      title: 'Organic Visibility Score (Share-of-Voice %)',
+      title: 'Modeled Visibility Score',
       icon: Activity,
       tag: 'Metric',
       color: 'text-blue-600 dark:text-blue-400',
       description:
-        'A single 0–100% weighted metric representing your domain\'s organic search market share. Instead of a naive unweighted average, it applies an industry-standard organic CTR decay curve: Rank #1 receives 30 points, Rank #2 gets 18, Rank #3 gets 12, Ranks #4–10 get 8–2 points, and Ranks #11–30 get 1 point. A higher score means more real click volume.',
+        'A 0–100% modeled rank score using a fixed curve: rank 1 receives 30 points, rank 2 gets 18, rank 3 gets 12, ranks 4–10 get 8–2 points, and ranks 11–30 get 1 point. The total is divided by 30 times the number of complete, comparable observations. Failed requests and incomplete coverage are excluded. This is not measured traffic or market share; mixed sources have no combined score.',
     },
     {
       id: 'cannibalization',
@@ -93,7 +93,7 @@ export const HelpView: React.FC<HelpViewProps> = ({
       tag: 'Analytics',
       color: 'text-emerald-600 dark:text-emerald-400',
       description:
-        'Whenever you scan a keyword that was previously tracked for the same target domain, country, language, and device, NexusRank automatically correlates previous position and calculates movement (+5 ranks, -2 ranks, or NEW). This lets you measure the direct impact of on-page updates over time.',
+        'Movement compares earlier completed observations for the same domain, keyword, requested settings, actual source, and complete coverage. Simulated and live rankings are never compared. FIRST means no earlier observation, NEW means previously not found, and DROPPED means a previously found result is now absent within complete coverage. Incompatible or incomplete history has no delta.',
     },
     {
       id: 'matrix',
@@ -102,7 +102,7 @@ export const HelpView: React.FC<HelpViewProps> = ({
       tag: 'Intelligence',
       color: 'text-purple-600 dark:text-purple-400',
       description:
-        'NexusRank extracts all root domains appearing on Page 1 across your keyword batch at zero extra API cost. It aggregates market share percentage and surfaces the Top 5 competing domains dominating search real estate in your vertical.',
+        'Competitor coverage is the percentage of complete, comparable keyword observations where an external domain appears among ranks 1–10. Each domain counts once per keyword. It is not traffic share. Mixed sources and partial scans do not produce a combined comparison.',
     },
   ];
 
@@ -267,8 +267,8 @@ export const HelpView: React.FC<HelpViewProps> = ({
                 </td>
                 <td className="py-3 px-4 text-emerald-600 dark:text-emerald-400 font-medium">$0 / Zero Keys</td>
                 <td className="py-3 px-4">DuckDuckGo Lite &amp; SearXNG</td>
-                <td className="py-3 px-4 font-mono">Top 50–100</td>
-                <td className="py-3 px-4">Production scans with zero API subscription costs.</td>
+                <td className="py-3 px-4 font-mono">One results batch</td>
+                <td className="py-3 px-4">Limited coverage; country, language, and device are not applied. Simulation fallback is off unless enabled explicitly.</td>
               </tr>
               <tr>
                 <td className="py-3 px-4 font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
@@ -286,7 +286,7 @@ export const HelpView: React.FC<HelpViewProps> = ({
                   SerpApi
                 </td>
                 <td className="py-3 px-4 text-zinc-500 font-medium">Paid Key Required</td>
-                <td className="py-3 px-4">Google Search (Official API)</td>
+                <td className="py-3 px-4">Google results via SerpApi</td>
                 <td className="py-3 px-4 font-mono">Top 100–500</td>
                 <td className="py-3 px-4">Enterprise-grade deep position tracking beyond Page 1.</td>
               </tr>
@@ -313,7 +313,7 @@ export const HelpView: React.FC<HelpViewProps> = ({
                 Required Columns &amp; Overrides
               </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Only the <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">keyword</code> column is required. Other columns inherit default scan settings if omitted.
+                CSV and XLSX are supported (5 MB, 2,000 rows maximum). Convert legacy XLS files first. Only the <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">keyword</code> column is required. Other columns inherit default scan settings if omitted.
               </p>
             </div>
 
@@ -339,7 +339,7 @@ export const HelpView: React.FC<HelpViewProps> = ({
                 <tr>
                   <td className="py-2.5 px-3 font-mono font-medium text-zinc-900 dark:text-zinc-100">keyword</td>
                   <td className="py-2.5 px-3 font-semibold text-blue-600 dark:text-blue-400">Yes</td>
-                  <td className="py-2.5 px-3">The search phrase to query in Google.</td>
+                  <td className="py-2.5 px-3">The search phrase to query with the selected provider.</td>
                 </tr>
                 <tr>
                   <td className="py-2.5 px-3 font-mono font-medium text-zinc-900 dark:text-zinc-100">country</td>

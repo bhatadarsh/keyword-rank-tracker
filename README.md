@@ -1,611 +1,230 @@
-<div align="center">
+# NexusRank
 
-# ⚡ NexusRank
+NexusRank is a local-first keyword rank tracker built with React, TypeScript, Tailwind CSS, and FastAPI. Upload keywords, inspect rankings and top-five SERP snapshots, review overlapping ranking URLs, compare compatible historical observations, and export CSV/XLSX reports.
 
-### Institutional-Grade, 100% Free & Open-Source SEO & SERP Intelligence Platform
-**Automated Rank Tracking · Competitor Share-of-Voice · Cannibalization Audits · SERP X-Ray**
+[Setup](#setup) · [Search sources](#search-sources-and-data-trust) · [Input format](#keyword-files) · [API](#api-reference) · [Verification](#testing-and-verification) · [Changelog](./CHANGELOG.md)
 
-<p align="center">
-  <a href="#-how-to-run-this-project">How to Run</a> •
-  <a href="#-system-architecture--data-flow">Architecture</a> •
-  <a href="#-core-capabilities--zero-cost-intelligence-engine">Features</a> •
-  <a href="#-configuration-csv-format--api-reference">Configuration</a> •
-  <a href="#-rest-api-reference">API Docs</a> •
-  <a href="#-testing--verification">Tests</a> •
-  <a href="#-troubleshooting--frequently-asked-questions">Troubleshooting</a>
-</p>
+## Current status
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B%20%7C%203.13-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
-[![TypeScript 6.0](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
-[![CI Tests](https://img.shields.io/badge/Pytest-33%20Passed-10B981?style=flat-square&logo=pytest&logoColor=white)](https://docs.pytest.org)
-[![Linter](https://img.shields.io/badge/Oxlint-0%20Warnings-10B981?style=flat-square)](https://oxc.rs)
+**Wave 1 (P0) is complete.** It adds recorded source/fallback provenance, bounded uploads, URL navigation, request cancellation, error recovery, reliable theme selection, and isolated backend tests. The last Wave 1 verification on **2026-11-22** recorded **93 passing backend tests** and frontend lint/build with **zero errors and zero warnings**.
 
-<br/>
+Wave 2 has not started. The canvas-first UI overhaul, font/contrast polish, and command-palette keyboard improvements remain queued. SSE, direct keyword paste, cancel/retry, and re-run actions are also not implemented yet. See [planned waves](#planned-waves).
 
-<!-- Dashboard Preview Callout Block -->
-<table align="center" width="100%">
-  <tr>
-    <td align="center">
-      <img src="docs/assets/dashboard-preview.png" alt="NexusRank Enterprise Analytics Dashboard" width="100%" onerror="this.src='https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80'; this.alt='NexusRank Analytics Preview';" />
-      <br/>
-      <em>Figure 1: NexusRank Command Center — Organic Share-of-Voice (SoV) Gauge, Rank Tier Distribution, and Live SERP Data Grid.</em>
-    </td>
-  </tr>
-</table>
+## Search sources and data trust
 
-</div>
+| Provider | Data | Coverage and settings |
+|---|---|---|
+| `free` | DuckDuckGo Lite or a configured SearXNG instance; no API key | One results batch, up to the requested maximum of 100. Full-depth coverage is not certified. Country, language, and device settings—including file overrides—are not applied. |
+| `mock` | Deterministic synthetic rankings and competitor snapshots | Offline demonstration/testing at requested depths of 100, 200, or 500. These are simulated observations, never evidence of live rankings. |
+| `serpapi` | Google results supplied by SerpApi; requires `SERP_API_KEY` | Requested depths of 100, 200, or 500 with pagination. Actual coverage may be smaller; incomplete responses are labeled accordingly. |
 
----
+**Simulation fallback is off by default.** For free search, the scan form offers an explicit option to allow simulation when live search returns no usable results. API clients opt in using `allow_fallback=true`. Enabling fallback does not mean it was used.
 
-## 💡 Why NexusRank? (Open-Source vs. Paid Commercial SaaS)
+Each processed keyword records its actual provider, fallback use/reason, observation time, results examined, coverage, and effective settings. A calm persistent banner identifies fallback results; individual rows and detail views identify synthetic data. A job can report `mixed` sources if its tasks came from different providers. Older scans retain `unknown` provenance; the app cannot retroactively verify whether their results were live or simulated.
 
-Traditional rank tracking SaaS platforms (Semrush, Ahrefs, Moz) charge hefty monthly subscriptions with artificial keyword caps, while basic open-source scripts either require paid third-party API keys or crash when Google changes their layout.
+Pending tasks, request errors, incomplete searches, and verified missing rankings are separate states. “Not found in retrieved results” does not mean the domain was absent throughout the requested depth. Job states are `queued`, `processing`, `completed`, `completed_with_errors`, and `failed`; review row details even when a job has finished.
 
-**NexusRank** is engineered as a **self-hostable, zero-marginal-cost SEO intelligence engine**:
+### Metrics and historical comparisons
 
-| Capability | NexusRank (Self-Hosted Open-Source) | Commercial SaaS ($99–$299/mo) | Basic Scraper Scripts |
-|---|:---:|:---:|:---:|
-| **Monthly Software Cost** | **$0.00 / Free Forever** | $1,188 – $3,588 / yr | Free (Broken frequently) |
-| **Keyword Tracking Limits** | **Unlimited** (Hardware Bound) | 500 – 1,500 Keyword Caps | Manual Loop / Fragile |
-| **Zero-Key Live Search** | **Yes** (DuckDuckGo Lite & SearXNG) | No (Paid Cloud Only) | Blocked by CAPTCHA |
-| **Deterministic Simulation** | **Yes** (SHA-256 Seeded Engine) | No | No |
-| **Keyword Cannibalization Audits** | **Automated** (Multi-URL Conflict) | Expensive Enterprise Tier | None |
-| **Organic Visibility Index (SoV %)** | **Built-in** (Weighted CTR Curve) | High-Tier Addon | None |
-| **Top 5 SERP X-Ray & AI Action Brief** | **Built-in** (Prompt Generator) | Manual Analysis | None |
-| **Historical Rank Delta Tracking** | **Automated** (`▲+5`, `▼-2`, `NEW`) | Standard | None |
-| **Data Privacy & Ownership** | **100% On-Premises** (Local SQLite/PG) | Stored on Vendor Servers | Local Text Files |
-| **Export Capabilities** | **UTF-8 BOM CSV & Auto-Fit Excel** | CSV / GSheets Export | Raw CSV |
+- **Visibility score** is a modeled rank index, not measured traffic, click probability, or market share. Rank 1 receives 30 points, rank 2 gets 18, rank 3 gets 12, ranks 4–10 get 8 down to 2, ranks 11–30 get 1, and other ranks get zero. The sum is divided by 30 times the eligible observation count and expressed as a percentage.
+- Aggregates use complete, successful observations from one known actual source. Request failures and incomplete coverage are excluded. Mixed-source jobs have no combined visibility/competitor aggregate; the sample size is exposed separately. Entirely synthetic scans can have modeled scores and remain labeled as simulations.
+- **Competitor coverage** counts each external domain once per eligible keyword where it appears at ranks 1–10. Percentages are keyword coverage, not traffic share. The keyword comparison table selects a non-target entry from each top-five snapshot.
+- **Historical movement** compares earlier completed jobs with the same domain, keyword, requested settings, depth, selected provider, actual source, fallback usage, and compatible effective settings. Both observations require complete coverage. Simulated and live rankings are never compared.
+- `FIRST` identifies a first eligible observation, `NEW` a previously absent ranking now found, and `DROPPED` a previously found ranking now absent within complete coverage. Incompatible, incomplete, and unverifiable history has no delta.
 
----
+Overlapping URLs are flagged for review. The presence of two URLs alone does not establish that a redirect or canonical change is appropriate.
 
-## 🎯 Core Capabilities & Zero-Cost Intelligence Engine
+## Setup
 
-### 1. Multi-Engine SERP Abstraction (`backend/providers/`)
-Switch providers on the fly per scan or configure globally via `.env`:
-- **Free Live Search (`free`):** 100% Zero-cost live search querying DuckDuckGo Lite and SearXNG with User-Agent rotation, redirect link unquoting, and transparent fallback so scans never fail.
-- **Smart Simulation (`mock`):** High-fidelity deterministic simulator using SHA-256 seeding (`hash(keyword + domain + locale)`). Produces reproducible baseline positions, realistic search competition (`wikipedia.org`, `reddit.com`, `github.com`), and multi-URL cannibalization scenarios for offline testing.
-- **SerpApi Integration (`serpapi`):** Official Google SERP API integration upgraded with **automated multi-page pagination** (`start = page * 100`) for depths of **200** and **500** results.
+### Requirements
 
-### 2. Zero-Extra-Cost SERP Analytics (`backend/services/rank_tracker.py`)
-Extract institutional-grade insights from every search response without extra API overhead:
-- **Organic Visibility Index & Share-of-Voice (SoV):** Calculates a 0–100% domain score weighted by an organic search CTR curve:
-  $$\text{Rank 1: } 30\,\text{pts} \quad \text{Rank 2: } 18\,\text{pts} \quad \text{Rank 3: } 12\,\text{pts} \quad \text{Ranks 4–10: } 8\text{ to }2\,\text{pts} \quad \text{Ranks 11–30: } 1\,\text{pt}$$
-- **Automated Keyword Cannibalization Detection:** Detects when 2 or more distinct pages from your domain rank for the same query. Stores `matching_urls_count`, `secondary_ranking_url`, and `secondary_rank` to eliminate keyword self-competition.
-- **Top 5 Competitor Discovery:** Extracts root domains from all Page 1 results and aggregates them into the **Top 5 Competing Domains** capturing search volume across your keyword batch.
-- **SERP X-Ray Snapshots:** Captures the #1–#5 competitor URLs, page titles, and ranks for every keyword, pairing them with an **instant AI SEO Action Brief** generator.
+- Python **3.11+** with a virtual environment. Wave 1 was verified locally on Python **3.13.1**; CI is configured for **3.11**.
+- Node.js **22.12+** recommended, or Node.js **20.19+**. Node 18 is not supported by the installed Vite version. Wave 1 was built locally on Node **22.14.0**.
+- npm, included with Node.js.
 
-### 3. High-ROI "Opportunities" Vault
-Keywords ranking in positions **11–30** (Pages 2 & 3) represent the highest-ROI optimization targets. NexusRank isolates these near-miss keywords into a dedicated **Opportunities Vault** with live telemetry counters so SEO associates know exactly where to prioritize on-page tweaks and internal linking.
+Run **one backend instance/worker only**. Background jobs run inside that process; startup recovery assumes any previously queued/processing jobs were interrupted. No distributed worker coordination is implemented.
 
-### 4. Human-Crafted SaaS Visual System & Interactive Guide (`frontend/src/`)
-- **`Inter` & `JetBrains Mono` Typography:** Crisp, human-crafted `Inter` UI typography with OpenType features (`cv02`, `cv03`, `cv04`, `cv11`). Strict `JetBrains Mono` (`tabular-nums`) styling reserved for numerical rankings, historical deltas, and URLs.
-- **True Neutral Zinc Palette:** Clean Light Mode (`#FAFAFA` page background, `#FFFFFF` cards, `#E4E4E7` borders) with a true-neutral Dark Mode toggle (`#09090B` Zinc-950 background, `#121215` cards, `#27272A` borders) and trustworthy Cobalt Blue (`#2563EB`) active accents. Zero neon glows or AI clutter.
-- **Dismissible 3-Step Interactive Welcome Guide:** Inline home screen checklist (`WelcomeGuideBanner.tsx`) that walks users through running a sample demo, filtering opportunities (11–30), and inspecting SERP X-Ray drawers, backed by persistent `localStorage` progress tracking.
-- **Built-In Help & Documentation Center:** Dedicated in-app documentation view (`HelpView.tsx`) featuring real-time search, plain-English glossary cards, search engines comparison table, and a 1-click sample CSV download.
-- **Contextual Metric Tooltips:** Accessible `<InfoTooltip />` popover triggers providing 1–2 sentence definitions directly beside core metrics.
-- **Command Palette (`Cmd+K` / `Ctrl+K`):** Global modal to jump between historical scans, filter opportunities, open documentation, trigger exports, and toggle themes.
-- **Client-Side CSV Previews:** Drag-and-drop file uploader that parses CSV headers and counts keywords in the browser before transmission.
-- **1-Click Instant Demos:** Pre-populated presets for `GitHub.com` (software queries) and `Wikipedia.org` (encyclopedic head terms) that create in-memory CSV files for zero-setup evaluation.
-- **Visibility-Aware Polling:** Live 2-second background task polling pauses automatically when the browser tab is hidden (`document.hidden`) and resumes immediately upon refocus.
+### Manual startup
 
-### 5. Production Reliability & Crash Recovery
-- **Self-Healing Startup Migration:** `ensure_schema_columns()` dynamically inspects `PRAGMA table_info()` and adds missing columns automatically. Existing databases never crash across version upgrades.
-- **Startup Crash Reconciliation:** `reconcile_orphan_jobs()` finds jobs left in `queued` or `processing` states after a server shutdown and marks them `failed`.
-- **Per-Keyword Database Commits:** Commits progress after every keyword query so the frontend updates in real-time and no work is lost if a scan is interrupted.
+From the project directory, open two terminals.
 
----
+**Backend — Windows PowerShell:**
 
-## 🏛️ System Architecture & Data Flow
-
-### System Architecture
-
-```mermaid
-flowchart TB
-    subgraph ClientLayer ["Client Layer · React 19 SPA (Vite :5173)"]
-        UI_Launch["ScanLaunchpad.tsx\n• Client-side CSV Preview\n• 1-Click Demo Presets\n• Engine Selector"]
-        UI_Onboarding["WelcomeGuideBanner.tsx\n• 3-Step Interactive Walkthrough\n• localStorage Progress Tracking"]
-        UI_Bento["BentoAnalyticsHeader.tsx\n• Organic Visibility Gauge\n• 5-Tier Distribution Bar\n• InfoTooltip Metric Popovers"]
-        UI_Grid["ResultsDataGrid.tsx\n• Smart Filters (11-30 Opps)\n• SERP X-Ray Drawer\n• AI Action Brief Prompt"]
-        UI_Help["HelpView.tsx\n• Built-In SEO Glossary\n• Search Engine Comparison\n• Sample CSV Downloader"]
-        UI_Palette["CommandPalette.tsx\n• Cmd+K / Ctrl+K Modal\n• History, Doc & Theme Controls"]
-    end
-
-    subgraph APILayer ["API Gateway Layer · FastAPI (Uvicorn :8000)"]
-        MW_CORS["CORSMiddleware\nAllow: localhost:5173"]
-        Router_Config["GET /api/config\nSingle Source of Truth"]
-        Router_Jobs["POST /api/rank-check\nGET /api/rank-check\nGET /api/rank-check/{id}\nDELETE /api/rank-check/{id}"]
-        Router_Export["GET /api/rank-check/{id}/download/{fmt}\nCSV (UTF-8 BOM) & Excel .xlsx"]
-    end
-
-    subgraph WorkerLayer ["Async Execution & Intelligence Engine"]
-        Worker["services/job_processor.py\nprocess_job() Worker Thread"]
-        IntelEngine["services/rank_tracker.py\n• CTR Visibility Score (SoV %)\n• Cannibalization Detector (2+ URLs)\n• Page 1 Competitor Aggregation\n• Historical Delta Correlation"]
-    end
-
-    subgraph ProviderLayer ["Multi-Engine Provider Abstraction"]
-        Factory["providers/__init__.py\nget_provider(name)"]
-        FreeProv["providers/free_serp_provider.py\nDuckDuckGo Lite + SearXNG\n(100% Free Live Search)"]
-        MockProv["providers/mock_provider.py\nDeterministic SHA-256 Engine\n(Offline Simulation)"]
-        SerpProv["providers/serpapi_provider.py\nSerpApi + Offset Pagination\n(Depth 100 - 500)"]
-    end
-
-    subgraph StorageLayer ["Persistence & File Cache"]
-        DBEngine["database.py\n• ensure_schema_columns()\n• reconcile_orphan_jobs()"]
-        DB[(SQLite / PostgreSQL\nJobs & KeywordTasks)]
-        Exports["exports/files/\nresults_{job_id}.{csv,xlsx}"]
-    end
-
-    UI_Launch -->|"POST /api/rank-check (multipart)"| Router_Jobs
-    UI_Bento & UI_Grid -->|"GET /api/rank-check/{id} (poll 2s)"| Router_Jobs
-    UI_Palette -->|"GET /api/rank-check"| Router_Jobs
-    UI_Grid -->|"GET download"| Router_Export
-
-    Router_Config --> FreeProv & SerpProv
-    Router_Jobs --> Worker
-    Router_Jobs --> DBEngine
-    Router_Export --> Exports
-
-    Worker --> Factory
-    Factory --> FreeProv & MockProv & SerpProv
-    Worker --> IntelEngine
-    Worker -->|"Commit Per Keyword"| DBEngine
-    DBEngine --- DB
+```powershell
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item ../.env.example .env
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
----
-
-### End-to-End Scan & Intelligence Pipeline
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as User / SEO Associate
-    participant UI as React 19 Frontend
-    participant API as FastAPI Gateway
-    participant Worker as Background Worker
-    participant Provider as SERP Engine (Free/Mock/SerpApi)
-    participant Intel as Intelligence Engine
-    participant DB as SQLite / PostgreSQL
-
-    User->>UI: Selects Engine, Uploads CSV / Triggers 1-Click Demo
-    UI->>UI: Instant in-browser CSV parsing & keyword count validation
-    UI->>API: POST /api/rank-check (FormData)
-    API->>API: Normalize domain, validate parameters, deduplicate keywords
-    API->>DB: Insert Job (status="queued") & KeywordTasks (status="pending")
-    API->>Worker: Launch process_job(job_id) in thread pool
-    API-->>UI: Return {job_id, status: "queued", provider: "free"}
-
-    loop Polling Loop (Every 2s, pauses if tab hidden)
-        UI->>API: GET /api/rank-check/{job_id}
-        API->>DB: Query job & tasks progress
-        API-->>UI: Return progress %, visibility score, and live results
-        UI->>UI: Update Bento analytics, SoV gauge & data table
-    end
-
-    loop For each KeywordTask
-        Worker->>DB: Check historical scan for domain + keyword
-        DB-->>Worker: Return previous_rank (if exists)
-        Worker->>Provider: search(keyword, country, lang, device, depth, domain)
-        Provider-->>Worker: Return SearchResponse(results[])
-        Worker->>Intel: analyze_serp_intelligence(domain, results)
-        Intel-->>Worker: Return best_rank, cannibalization, top_5_competitors, delta
-        Worker->>DB: Commit KeywordTask updates (rank, delta, secondary_url, json)
-    end
-
-    Worker->>Intel: calculate_visibility_score() & aggregate_top_competitors()
-    Worker->>DB: Update Job (status="completed", visibility_score, competitors_summary)
-    Worker-->>API: Processing Finished
-
-    User->>UI: Clicks "Download Excel" or opens "SERP X-Ray Drawer"
-    UI->>API: GET /api/rank-check/{job_id}/download/xlsx
-    API->>DB: Query all tasks for job
-    API->>API: Generate auto-fitted Excel spreadsheet with pandas & openpyxl
-    API-->>User: Streams .xlsx file
-```
-
----
-
-## 🚀 How to Run This Project
-
-NexusRank is designed for zero-friction onboarding. Whether you prefer a single-click script, a containerized Docker setup, or manual granular control, follow the method that matches your environment.
-
-### 📋 Prerequisites Checklist
-
-Before running locally without Docker, ensure you have:
-- **Python 3.11, 3.12, or 3.13** installed (`python --version` or `python3 --version`)
-- **Node.js 18, 20, or 22** + **npm** installed (`node --version` and `npm --version`)
-- *(Optional)* **Docker & Docker Compose** (if using containerized execution)
-
----
-
-### Method 1: Windows 1-Click Automated Launcher (Recommended for Windows)
-
-NexusRank includes an intelligent PowerShell launcher (`start.ps1`) that handles the entire setup lifecycle automatically:
-
-1. Open PowerShell and navigate to the project directory:
-   ```powershell
-   cd "keyword-rank-tracker"
-   ```
-2. Run the launcher script:
-   ```powershell
-   .\start.ps1
-   ```
-
-**What the script does automatically:**
-- Copies `.env.example` to `.env` (backend & root) if missing.
-- Checks if ports `8000` or `5173` are occupied and cleanly terminates zombie processes.
-- Creates `backend/venv` and installs all dependencies from `requirements.txt` if not present.
-- Runs `npm install` inside `frontend/` if `node_modules` is missing.
-- Spawns the FastAPI backend (`http://localhost:8000`) and Vite frontend (`http://localhost:5173`) in independent terminal consoles.
-- Automatically launches your default web browser to [http://localhost:5173](http://localhost:5173).
-
-> [!TIP]
-> If Windows blocks script execution with an `ExecutionPolicy` error, run:
-> ```powershell
-> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-> .\start.ps1
-> ```
-
----
-
-### Method 2: macOS & Linux 1-Script Launcher (Recommended for Unix)
-
-We provide a POSIX shell script (`start.sh`) with auto-environment configuration and graceful shutdown hooks:
-
-1. Open your terminal and navigate to the project root:
-   ```bash
-   cd keyword-rank-tracker
-   ```
-2. Grant execution permissions and run:
-   ```bash
-   chmod +x start.sh
-   ./start.sh
-   ```
-
-**What the script does automatically:**
-- Validates that `python3` and `npm` are installed.
-- Provisions `.env` from `.env.example`.
-- Builds the `backend/venv` virtual environment and installs pinned dependencies.
-- Runs `npm install` inside `frontend/` if dependencies aren't built.
-- Starts both servers concurrently in the background.
-- Captures `SIGINT` / `SIGTERM` — pressing `Ctrl+C` cleanly shuts down both background processes without leaving orphaned ports.
-
----
-
-### Method 3: Docker & Docker Compose (Zero Local Dependencies)
-
-Run the entire platform inside isolated, multi-stage production containers with zero host dependencies installed:
+**Backend — macOS/Linux:**
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/keyword-rank-tracker.git
-cd keyword-rank-tracker
-
-# Build and start all services
-docker compose up --build
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install -r requirements.txt
+cp ../.env.example .env
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-- **Run in the background (detached daemon):**
-  ```bash
-  docker compose up -d
-  ```
-- **View live streaming container logs:**
-  ```bash
-  docker compose logs -f
-  ```
-- **Stop all services:**
-  ```bash
-  docker compose down
-  ```
+Copy the environment template only on first setup; preserve an existing configuration. Edit the backend environment file before starting if you need a provider key or a different database location.
 
----
+**Frontend — second terminal, from the project directory:**
 
-### Method 4: Manual Step-by-Step Local Setup
+```bash
+cd frontend
+npm ci
+npm run dev
+```
 
-If you prefer to start each service in separate terminal windows:
+Open [NexusRank](http://localhost:5173). [API health](http://localhost:8000/health), [provider configuration](http://localhost:8000/api/config), and [interactive API documentation](http://localhost:8000/docs) are available while the backend is running.
 
-#### Step 1: Backend Setup (FastAPI)
+### Existing launchers and containers
 
-1. Open Terminal 1 and enter the backend directory:
-   ```bash
-   cd keyword-rank-tracker/backend
-   ```
-2. Create and activate a Python virtual environment:
-   - **Windows (PowerShell):**
-     ```powershell
-     python -m venv venv
-     .\venv\Scripts\activate
-     ```
-   - **macOS / Linux:**
-     ```bash
-     python3 -m venv venv
-     source venv/bin/activate
-     ```
-3. Upgrade `pip` and install dependencies:
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-4. Initialize the environment file:
-   ```bash
-   # Windows PowerShell:
-   Copy-Item ../.env.example .env
+[Windows launcher](./start.ps1) and [macOS/Linux launcher](./start.sh) provide automated local setup. The Windows launcher currently force-stops processes occupying ports 8000/5173; use manual startup if those ports belong to another application.
 
-   # macOS / Linux:
-   cp ../.env.example .env
-   ```
-5. Start the FastAPI development server:
-   ```bash
-   python -m uvicorn main:app --reload --port 8000
-   ```
-   *The backend will automatically create and migrate `rank_tracker.db` on startup.*
+[Compose configuration](./docker-compose.yml), [backend image](./backend/Dockerfile), and [frontend image](./frontend/Dockerfile) are included. Container execution was not reverified in Wave 1. Provider environment variables are specified directly in Compose; the root environment file does not automatically override them. The current database volume mounts the application directory, so container persistence/build-context cleanup remains part of the final polish wave.
 
-#### Step 2: Frontend Setup (React 19 + Vite)
+### First scan
 
-1. Open Terminal 2 and enter the frontend directory:
-   ```bash
-   cd keyword-rank-tracker/frontend
-   ```
-2. Install Node dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-4. Open [http://localhost:5173](http://localhost:5173) in your browser.
+1. Open New Scan and load the GitHub or Wikipedia sample dataset, or upload your own file.
+2. Enter a company/project name and target domain.
+3. Select an available provider. Choose Simulation for an offline demonstration. Free search has limited coverage; enable simulation fallback only if synthetic substitute results are acceptable.
+4. Start the scan. The welcome guide also has a direct GitHub demo action using the configured default provider.
+5. Inspect results, filter Opportunities (11–30), open a top-five snapshot, copy an AI brief prompt, or download a report.
 
----
+## Navigation and recovery
 
-### 🌐 Service Verification & Health Checks
+| URL | View |
+|---|---|
+| `/` | New Scan |
+| `/scans/:jobId` | Rankings for a saved scan |
+| `/scans/:jobId?filter=opportunities` | Opportunities within that scan |
+| `/competitors?jobId=:jobId` | Competitors for the selected scan |
+| `/history` | Recent scan history |
+| `/help` | Help, glossary, and sample CSV |
 
-Once running, verify each endpoint:
+Scan URLs retain search (`q`), filter (`filter`), sort column (`sort`), and direction (`dir`). Refresh and browser Back/Forward preserve this context. New Scan opens an empty form. Missing scans and unknown routes provide recovery links.
 
-| Interface | URL | Health Expectation |
-|---|---|---|
-| **Web Dashboard** | [http://localhost:5173](http://localhost:5173) | Obsidian Dark Theme interface loads with Scan Launchpad |
-| **Backend Health** | [http://localhost:8000/health](http://localhost:8000/health) | Returns `{"status":"ok","platform":"NexusRank","version":"2.0.0"}` |
-| **Config Endpoint** | [http://localhost:8000/api/config](http://localhost:8000/api/config) | Returns available providers (`free`, `mock`, `serpapi`) |
-| **Interactive Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | OpenAPI Swagger UI to execute API calls |
+Live updates currently use HTTP polling about every two seconds, paused while the tab is hidden. Requests are scoped to the selected job, cancelled on navigation, and prevented from overlapping. Transient connection loss retains the last saved results; a missing/deleted scan clears cached results. The command palette is currently opened with the header button; its advertised keyboard opening/navigation improvements are queued for Wave 2.
 
----
+Theme selection overrides the OS preference using a class-based dark variant and is initialized before paint. Disabled browser storage falls back safely; malformed onboarding state is discarded. A root Error Boundary provides a recovery link for rendering failures.
 
-### ⚡ Running Your First Scan in 30 Seconds
+## Configuration
 
-1. Open **[http://localhost:5173](http://localhost:5173)** in your browser.
-2. In the **Scan Launchpad**, try one of the **1-Click Demo Presets**:
-   - Click **`⚡ GitHub.com`** (loads developer search keywords: `git repository`, `code review tool`, `devops pipeline`, etc.)
-   - Click **`📚 Wikipedia.org`** (loads general knowledge head terms: `artificial intelligence`, `quantum computing`, etc.)
-3. Choose your SERP Engine:
-   - **`Free Live Search`**: 100% zero-cost live web queries via DuckDuckGo Lite & SearXNG (no API keys required).
-   - **`Domain Simulator`**: Fast deterministic mock engine with reproducible positions and simulated competitor pool.
-4. Click **"Start Rank Scan"**.
-5. Observe the live **Bento Analytics Header**, **Organic Visibility Index (SoV %)**, **Striking-Distance Opportunities (11–30)** tab, and click any row to open the **SERP X-Ray Drawer**!
+See the [environment template](./.env.example). The backend loads its environment before creating the database engine.
 
----
+| Variable | Default / behavior |
+|---|---|
+| `DATABASE_URL` | `sqlite:///./rank_tracker.db`, relative to the backend working directory. SQLite is the default local storage. |
+| `SERP_PROVIDER` | `free`. Configuration falls back to free search if the default is unknown or SerpApi lacks a key; explicit invalid/unconfigured scan submissions are rejected. |
+| `SERP_API_KEY` | Empty. Required for SerpApi. |
+| `SEARXNG_URL` | Empty. Optional SearXNG search endpoint; free search tries it before DuckDuckGo. |
+| `CORS_ORIGINS` | Comma-separated localhost defaults: `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost`. Wildcard entries are not accepted. |
+| `EXPORT_DIR` | `exports/files` under the backend working directory. Override to change export storage. |
 
-## ⚙️ Configuration, CSV Format & API Reference
+Fallback permission is a per-scan form field, not a global environment setting. CORS is a browser-origin policy, not authentication; the application remains intended for local use.
 
-### Environment Variables
+### Startup and existing databases
 
-NexusRank is ready to run out of the box with zero required configuration. To customize your setup, edit `.env`:
+FastAPI lifespan creates missing tables, adds supported missing columns, then marks interrupted jobs failed and settles their pending tasks. **Migration errors abort startup visibly.** Importing the application does not initialize or repair a database.
 
-| Variable | Default Value | Description |
-|---|:---:|---|
-| `DATABASE_URL` | `sqlite:///./rank_tracker.db` | SQLAlchemy connection URL. Switch to `postgresql://user:pass@host/db` for production. |
-| `SERP_PROVIDER` | `free` | Default engine: `free` (100% zero-cost live search), `mock` (simulation), or `serpapi` (paid API). |
-| `SEARXNG_URL` | *(empty)* | Optional public or self-hosted SearXNG endpoint used by `FreeSerpProvider`. |
-| `SERP_API_KEY` | *(empty)* | API key from [serpapi.com](https://serpapi.com/manage-api-key) (only required if `SERP_PROVIDER=serpapi`). |
+Back up the existing SQLite file before upgrading. P0 migration preserves existing rows and adds provenance fields; old observations remain unknown and their unverified comparisons/aggregates are not presented as trustworthy. Do not delete the database to resolve a migration error unless you explicitly intend to lose scan history.
 
----
+## Keyword files
 
-### Input CSV & Excel Format
+Supported inputs are **UTF-8 CSV** (with or without BOM) and **XLSX**. Legacy **XLS is rejected** with a message to save as XLSX or CSV.
 
-NexusRank accepts `.csv`, `.xls`, and `.xlsx` files. Only the `keyword` column is required. You can optionally include per-row overrides for country, language, and device:
+Limits enforced by the shared parser:
+
+| Limit | Maximum |
+|---|---|
+| Uploaded file | 5 MiB (5,242,880 bytes) |
+| Data rows, before deduplication | 2,000 |
+| Columns | 20, with unique normalized names |
+| Keyword length | 500 characters; no null bytes |
+| Expanded XLSX archive | 50 MiB |
+
+Only `keyword` is required. Optional `country`, `language`, and `device` values override requested job settings; blank overrides inherit defaults. Overrides are validated even when the chosen provider cannot apply them. Free search does not apply locale/device settings.
 
 ```csv
 keyword,country,language,device
-git repository,United States,English,desktop
-code review tool,United States,English,desktop
-skill assessment platform,India,English,mobile
-career roadmap software,United Kingdom,English,desktop
-online exam proctoring,Canada,English,desktop
+"rank tracker, free",United States,English,desktop
+00123,India,English,mobile
+NA,United Kingdom,English,desktop
 ```
 
-- Missing columns default to the job parameters selected in the UI.
-- Empty rows and duplicate keywords within the same scan are automatically deduplicated.
+Quoted commas and multiline CSV fields are supported. CSV keyword text is not converted into numbers or missing-value tokens, so `00123` and `NA` remain literal strings. In XLSX, store keywords as text to preserve leading zeros; formula keywords must be replaced with text values. Empty keyword rows are skipped. Duplicate keyword/settings tuples are removed, with skipped/duplicate counts returned in the preview. Invalid overrides reject the upload with a row-specific message.
 
----
+Preview and submission use the same server parser, off the event loop. Submission validates again. Example datasets: [sample keywords](./sample_keywords.csv), [GitHub](./test_github.csv), and [Wikipedia](./test_wikipedia.csv).
 
-### REST API Reference
+## Exports
 
-All routes are versioned and documented under `/docs` via Swagger UI:
+CSV uses UTF-8 BOM for Excel compatibility. XLSX contains a Rankings worksheet with fitted column widths. Reports include requested and actual source, task/job fallback use and reason, actual coverage, results examined, effective settings, observation time, comparison state, and errors alongside the ranking fields.
 
-| HTTP Method | Endpoint | Description |
+A missing rank on an error or pending task is not exported as a verified missing result. Legacy provenance remains unknown. Exports are generated on demand and removed when their scan is deleted; automatic TTL cleanup remains queued. Running scans cannot be deleted. Clipboard copy uses the current table filter/sort; CSV/XLSX downloads contain the entire scan.
+
+## API reference
+
+Interactive schemas are available at `/docs` and `/redoc` on the backend.
+
+| Method | Endpoint | Purpose |
 |---|---|---|
-| `GET` | `/api/config` | Returns available providers (`free`, `mock`, `serpapi`), supported countries, and languages. |
-| `POST` | `/api/rank-check` | Accepts `multipart/form-data` with keyword file and parameters; queues async background scan. |
-| `GET` | `/api/rank-check` | Returns the 50 most recent historical scans with visibility scores and completion stats. |
-| `GET` | `/api/rank-check/{job_id}` | Returns real-time job status, progress percentage, cannibalization data, and results array. |
-| `DELETE` | `/api/rank-check/{job_id}` | Permanently deletes a scan, all associated keyword tasks, and cached export files from disk. |
-| `GET` | `/api/rank-check/{job_id}/download/{fmt}` | Generates and streams report in `csv` (UTF-8 BOM) or `xlsx` (auto-fitted Excel columns). |
-| `GET` | `/health` | Health check endpoint returning platform status, version (`2.0.0`), and active engine mode. |
+| `GET` | `/api/config` | Provider availability/capabilities, locales, upload limits, and default provider. Alias: `/api/rank-check/config`. |
+| `POST` | `/api/rank-check/preview` | Validate a CSV/XLSX upload and return counts, columns, and sample keywords. No job is created. |
+| `POST` | `/api/rank-check` | Validate input and queue a scan. Returns its ID immediately. |
+| `GET` | `/api/rank-check` | Latest 50 jobs with counts, status, source, and aggregate data. |
+| `GET` | `/api/rank-check/{job_id}` | Job progress, errors, provenance, coverage, and keyword results. |
+| `DELETE` | `/api/rank-check/{job_id}` | Delete a terminal job and associated reports; returns 409 while running. |
+| `GET` | `/api/rank-check/{job_id}/download/{format}` | Download `csv` or `xlsx` for the entire scan. |
+| `GET` | `/health` | Basic API health and configured default-provider information. |
 
----
+Create-job requests use multipart fields `company_name`, `domain`, `country`, `language`, `device`, `depth`, `provider`, `file`, and optional `allow_fallback` (default `false`). Preview accepts `file` and optional country/language/device defaults. Unknown providers, invalid settings, and unsupported depths are rejected. SerpApi is rejected when its key is missing. Free search accepts depth 100 only, as a maximum for one batch rather than a guaranteed number of results.
 
-## 📁 Repository Map
+## Testing and verification
 
-```
-keyword-rank-tracker/
-├── .github/
-│   └── workflows/
-│       └── ci.yml                   # Automated GitHub Actions CI workflow
-├── backend/
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── routes.py                # REST API endpoints, file uploads, delete & config handlers
-│   ├── exports/
-│   │   ├── __init__.py
-│   │   ├── generator.py             # CSV (UTF-8 BOM) and Excel .xlsx spreadsheet generators
-│   │   └── files/                   # Cached report artifacts (auto-cleaned on job delete)
-│   ├── providers/
-│   │   ├── __init__.py              # Provider factory (get_provider)
-│   │   ├── base.py                  # Abstract SerpProvider & Pydantic models (SearchResult)
-│   │   ├── free_serp_provider.py    # Zero-key live SERP provider (DuckDuckGo Lite + SearXNG)
-│   │   ├── mock_provider.py         # Deterministic domain simulation with SHA-256 seeding
-│   │   └── serpapi_provider.py      # SerpApi integration with depth > 100 offset pagination
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── job_processor.py         # Background worker thread & historical rank correlation
-│   │   └── rank_tracker.py          # Domain normalization, CTR curve, cannibalization & competitor SoV
-│   ├── tests/
-│   │   ├── __init__.py
-│   │   ├── test_domain_matching.py  # 23 tests: normalization, subdomains, suffix attacks, best rank
-│   │   └── test_seo_analytics.py    # 10 tests: CTR curves, cannibalization, competitors, recovery
-│   ├── database.py                  # SQLAlchemy engine, ensure_schema_columns & crash reconciliation
-│   ├── Dockerfile                   # Backend Docker container specification
-│   ├── main.py                      # FastAPI entrypoint, lifespan startup tasks & CORS middleware
-│   ├── models.py                    # SQLAlchemy ORM models: Job and KeywordTask
-│   ├── rank_tracker.db              # SQLite development database (auto-migrating)
-│   └── requirements.txt             # Pinned backend Python dependencies
-├── docs/
-│   └── assets/                      # Screenshot and diagram assets
-├── frontend/
-│   ├── public/                      # Static assets & favicon
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── client.ts            # Typed Axios client service
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   │   ├── CommandPalette.tsx # Global Cmd+K / Ctrl+K search & shortcut modal
-│   │   │   │   └── InfoTooltip.tsx    # Contextual popover tooltip component for metrics
-│   │   │   ├── help/
-│   │   │   │   └── HelpView.tsx       # Built-in Help & Glossary center with sample CSV download
-│   │   │   ├── history/
-│   │   │   │   └── HistoryView.tsx    # Searchable scan archive with status badges & deletion
-│   │   │   ├── layout/
-│   │   │   │   └── AppShell.tsx       # Clean 240px navigation, engine status, and theme toggle
-│   │   │   ├── onboarding/
-│   │   │   │   └── WelcomeGuideBanner.tsx # Dismissible 3-step interactive onboarding card
-│   │   │   ├── results/
-│   │   │   │   ├── BentoAnalyticsHeader.tsx # Organic Visibility SoV gauge & 5-tier cards
-│   │   │   │   ├── CompetitorMatrixView.tsx # Page 1 Competitor domain cross-reference
-│   │   │   │   └── ResultsDataGrid.tsx      # Table, smart filters, and SERP X-Ray drawer
-│   │   │   └── scan/
-│   │   │       └── ScanLaunchpad.tsx  # Centered form, drag & drop upload & 1-click demos
-│   │   ├── hooks/
-│   │   │   └── useOnboarding.ts       # Persistent localStorage interactive walkthrough state
-│   │   ├── types/
-│   │   │   └── index.ts             # TypeScript definitions for jobs, tasks, views, and telemetry
-│   │   ├── App.tsx                  # Root application orchestrator with visibility-aware polling
-│   │   ├── index.css                # Inter & JetBrains Mono typography, true neutral Zinc tokens
-│   │   └── main.tsx                 # React 19 application entrypoint
-│   ├── Dockerfile                   # Frontend multi-stage build container
-│   ├── nginx.conf                   # Nginx reverse proxy configuration for Docker
-│   ├── package.json                 # Node dependencies and scripts
-│   ├── tsconfig.json                # TypeScript compiler configuration
-│   └── vite.config.ts               # Vite configuration with React & Tailwind plugins
-├── .env                             # Local environment variables
-├── .env.example                     # Environment template documentation
-├── ARCHITECTURE.md                  # Comprehensive architectural reference manual
-├── CHANGELOG.md                     # Chronological engineering updates log
-├── docker-compose.yml               # Multi-container orchestration (Backend + Frontend)
-├── sample_keywords.csv              # General sample keywords dataset
-├── start.ps1                        # Windows 1-click dev launcher script
-├── start.sh                         # macOS/Linux 1-script dev launcher
-├── test_github.csv                  # Integration test keywords for GitHub.com
-└── test_wikipedia.csv               # Integration test keywords for Wikipedia.org
-```
-
----
-
-## 🧪 Testing & Verification
-
-NexusRank enforces strict testing across both backend and frontend layers:
+From the backend directory, activate its virtual environment and run:
 
 ```bash
-# 1. Run backend unit & integration tests (33 tests)
-cd backend
-pytest tests/ -v
+python -m pytest tests/ -v
+```
 
-# 2. Run frontend linter (Oxlint)
-cd frontend
+Run pytest in a **dedicated process**. [Test fixtures](./backend/tests/conftest.py) select a temporary SQLite database and export directory before application imports, reset the schema between tests, and clean up at session end. They replace provider settings and clear live credentials. [P0 regression tests](./backend/tests/test_p0.py) cover ingestion, fallback provenance, partial responses, compatible history, worker terminal states, exports, migration/recovery, CORS, import safety, and parsing off the event loop. Upstream failure cases use mocks; passing tests do not certify live provider availability.
+
+From the frontend directory:
+
+```bash
 npm run lint
-
-# 3. Build frontend bundle (TypeScript + Vite)
 npm run build
 ```
 
-**Continuous Integration:** Every commit and pull request triggers `.github/workflows/ci.yml`, running the full pytest suite on Python 3.11 and validating `npm run lint` and `npm run build` on Node 20.
+The build runs TypeScript checking followed by Vite bundling. [CI](./.github/workflows/ci.yml) is configured to run backend pytest on Python 3.11 and frontend lint/build on Node 20.
 
----
+**Last completed Wave 1 checks (2026-11-22):**
 
-## 🛠️ Troubleshooting & Frequently Asked Questions
+- 93 backend tests passed, including all 33 original tests.
+- Frontend lint/build passed with zero errors and warnings; editor diagnostics and whitespace checks were clean.
+- Browser checks covered refresh/filter URLs, Back navigation, New Scan, stale-response cancellation, explicit themes, malformed onboarding state, uploads/previews, preserved inputs after errors, fallback disclosure, missing routes/scans, and Error Boundary recovery.
+- Browser tests used a disposable database. The existing application database's SHA-256 was unchanged. Container execution, live provider availability, and the queued visual overhaul were not certified by these checks.
 
-### Q: Port 8000 or 5173 is already in use
-**Solution:**
-- If you used `start.ps1`, it automatically kills stale processes on those ports.
-- Alternatively, find and stop the process manually:
-  - **Windows (PowerShell):**
-    ```powershell
-    Get-NetTCPConnection -LocalPort 8000, 5173 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-    ```
-  - **macOS / Linux:**
-    ```bash
-    kill -9 $(lsof -ti :8000) 2>/dev/null || true
-    kill -9 $(lsof -ti :5173) 2>/dev/null || true
-    ```
+## Source map
 
-### Q: PowerShell blocks `start.ps1` with `ExecutionPolicy` error
-**Solution:**
-Windows restricts execution of unsigned scripts by default. Run:
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\start.ps1
-```
-*(This bypasses the policy only for the current terminal session without changing system-wide security settings).*
+- [API routes](./backend/api/routes.py), [models](./backend/models.py), and [startup](./backend/main.py).
+- [Database migration/recovery](./backend/database.py), [upload parser](./backend/services/ingestion.py), [worker](./backend/services/job_processor.py), and [analytics](./backend/services/rank_tracker.py).
+- [Search providers](./backend/providers/) and [report generator](./backend/exports/generator.py).
+- [Application routing](./frontend/src/App.tsx), [job polling](./frontend/src/hooks/useJob.ts), and [API client](./frontend/src/api/client.ts).
+- [UI components](./frontend/src/components/), including [source disclosures](./frontend/src/components/results/ProvenanceNotice.tsx) and [Error Boundary](./frontend/src/components/common/ErrorBoundary.tsx).
 
-### Q: Do I need a SerpApi API key to use NexusRank?
-**Answer:**
-**No.** NexusRank defaults to `SERP_PROVIDER=free`, which uses our zero-key `FreeSerpProvider` (querying DuckDuckGo Lite and SearXNG with smart User-Agent rotation). You also have access to `mock` for deterministic domain simulations. You only need a SerpApi key if you explicitly choose the `serpapi` engine.
+## Planned waves
 
-### Q: How do I reset or clean my database?
-**Solution:**
-Delete the SQLite file `backend/rank_tracker.db`. The application will automatically recreate the database and all tables with updated schema upon the next startup.
+| Wave | Status / scope |
+|---|---|
+| 1 — P0 | Complete: trust, routing, stability, ingestion, theme correctness, migration, and test isolation. |
+| 2 — P1 + P3.1 + P2.6 | Queued: canvas-first layout, compact metrics, plain copy, restrained motion, table rendering improvements, skeletons/toasts, font/contrast polish, and command-palette keyboard navigation. |
+| 3 — P2 | Queued after the UI visual check: lightweight SSE with polling fallback, paste keywords, cancel/retry, re-run/duplicate settings, and worker pacing improvements. No multi-process event bus. |
+| 4 — remaining P3 | Queued: accessibility completion, mobile navigation, export retention/safety, history performance, deployment/launcher hygiene, tests, and documentation polish. Authentication is out of scope; configurable CORS has already landed. |
 
----
-
-## 🗺️ Open-Source Roadmap & Contributing
-
-We welcome contributions from the community! Here are our active development milestones:
-- [ ] **Automated Scheduled Scans:** Built-in cron / recurring daily rank checks using APScheduler.
-- [ ] **Local LLM SEO Action Briefs:** Native integration with Ollama to generate full content briefs on local models ($0 cost).
-- [ ] **Alert Webhooks:** Instant Discord, Slack, and email notifications when high-priority keywords drop out of Page 1.
-- [ ] **Additional Search Engines:** Bing, Yahoo, and Baidu search abstraction providers.
-
-### How to Contribute
-1. Fork the repository.
-2. Create your feature branch (`git checkout -b feature/amazing-feature`).
-3. Commit your changes (`git commit -m 'Add amazing feature'`).
-4. Ensure all tests pass (`pytest tests/ -v && npm run build`).
-5. Push to your branch (`git push origin feature/amazing-feature`).
-6. Open a Pull Request.
-
----
-
-## 📜 License
-
-NexusRank is open-source software licensed under the [MIT License](LICENSE).  
-Free for personal, commercial, and enterprise use.
-
----
-
-<div align="center">
-  <sub>Built with precision for SEO engineers, indie hackers, and growth teams worldwide.</sub>
-</div>
+See the [changelog](./CHANGELOG.md) for the implementation history. Historical entries describe behavior at the time they were written; this README describes the current P0 implementation.

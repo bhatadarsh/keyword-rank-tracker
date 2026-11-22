@@ -1,212 +1,157 @@
 import json
-import time
 import logging
-from typing import List, Optional
-from sqlalchemy.orm import Session
+import time
+from datetime import datetime, timezone
+
+from database import SessionLocal
 from models import Job, KeywordTask, JobStatus, KeywordStatus
 from providers import get_provider
-from services.rank_tracker import (
-    analyze_serp_intelligence,
-    calculate_visibility_score,
-    aggregate_top_competitors,
-)
-from database import SessionLocal
+from providers.base import SearchResponse
+from services.rank_tracker import analyze_serp_intelligence, calculate_visibility_score, aggregate_top_competitors
 
 logger = logging.getLogger(__name__)
-
-# Delay between API calls (seconds) — prevents rate limiting on free/live providers
 REQUEST_DELAY = 1.0
-
-# Retry settings for rate-limited requests
 MAX_RETRIES = 3
 RETRY_BACKOFF = [3, 7, 15]
+SUCCESS_STATES = {"found", "not_found"}
+ERROR_STATES = {"api_error", "rate_limited", "timeout", "invalid"}
 
 
-def _find_previous_rank(
-    db: Session,
-    current_job_id: str,
-    target_domain: str,
-    keyword: str,
-    country: str,
-    language: str,
-    device: str,
-) -> Optional[int]:
-    """Finds the most recent historical rank for the same domain and keyword parameters."""
-    try:
-        prev_task = (
-            db.query(KeywordTask)
-            .join(Job, KeywordTask.job_id == Job.id)
-            .filter(
-                Job.id != current_job_id,
-                Job.domain == target_domain,
-                KeywordTask.keyword == keyword,
-                KeywordTask.country == country,
-                KeywordTask.language == language,
-                KeywordTask.device == device,
-                KeywordTask.status.in_([KeywordStatus.found.value, KeywordStatus.not_found.value]),
-            )
-            .order_by(Job.created_at.desc())
-            .first()
-        )
-        if prev_task:
-            return prev_task.rank
-    except Exception as exc:
-        logger.debug("Failed checking previous rank: %s", exc)
-    return None
+def compare_previous_observation(db, job, task):
+    """Only completed, earlier, like-for-like observations can establish movement."""
+    task.previous_rank = None
+    task.previous_status = None
+    task.rank_delta = None
+    task.comparison_status = "unavailable"
+    if task.status not in SUCCESS_STATES or not task.coverage_complete or task.actual_provider == "unknown":
+        return
+    earlier = db.query(KeywordTask).join(Job).filter(
+        Job.created_at < job.created_at,
+        Job.domain == job.domain,
+        KeywordTask.keyword == task.keyword,
+        KeywordTask.country == task.country,
+        KeywordTask.language == task.language,
+        KeywordTask.device == task.device,
+    )
+    previous = earlier.filter(
+        Job.status.in_(["completed", "completed_with_errors"]),
+        Job.provider == job.provider, Job.depth == job.depth,
+        KeywordTask.status.in_(SUCCESS_STATES),
+        KeywordTask.actual_provider == task.actual_provider,
+        KeywordTask.fallback_used == task.fallback_used,
+        KeywordTask.coverage_complete.is_(True),
+        KeywordTask.effective_country == task.effective_country,
+        KeywordTask.effective_language == task.effective_language,
+        KeywordTask.effective_device == task.effective_device,
+        KeywordTask.observed_at < task.observed_at,
+    ).order_by(Job.created_at.desc(), KeywordTask.id.desc()).first()
+    if previous is None:
+        if earlier.first() is None:
+            task.comparison_status = "first_seen"
+        return
+    task.previous_rank = previous.rank
+    task.previous_status = previous.status
+    if task.rank is not None and previous.rank is not None:
+        task.rank_delta = previous.rank - task.rank
+        task.comparison_status = "up" if task.rank_delta > 0 else "down" if task.rank_delta < 0 else "unchanged"
+    elif task.rank is not None:
+        task.comparison_status = "newly_found"
+    elif previous.rank is not None:
+        task.comparison_status = "dropped"
+    else:
+        task.comparison_status = "unchanged"
+
+
+def update_job_summary(job, tasks):
+    observed = [task for task in tasks if task.status != "pending"]
+    sources = {task.actual_provider or "unknown" for task in observed}
+    job.actual_provider = next(iter(sources)) if len(sources) == 1 else "mixed" if sources else "unknown"
+    job.fallback_used = any(task.fallback_used for task in observed)
+    reasons = sorted({task.fallback_reason for task in observed if task.fallback_reason})
+    job.fallback_reason = "; ".join(reasons) or None
+    # Never mix simulated and live rankings in an aggregate, or score request failures as zero.
+    eligible = [task for task in tasks if task.status in SUCCESS_STATES and task.coverage_complete]
+    if len(sources) != 1 or "unknown" in sources:
+        eligible = []
+    job.metrics_sample_size = len(eligible)
+    job.visibility_score = calculate_visibility_score([task.rank for task in eligible]) if eligible else None
+    job.top_competitors_summary = json.dumps(aggregate_top_competitors(
+        [json.loads(task.page_1_competitors_json or "[]") for task in eligible], len(eligible)
+    ) if eligible else [])
 
 
 def process_job(job_id: str):
-    """
-    Background worker to process a rank check job.
-    Runs in a dedicated thread with its own database session.
-    """
-    db: Session = SessionLocal()
-    job = None
-
-    try:
-        job = db.query(Job).filter(Job.id == job_id).first()
-        if not job:
-            logger.error("Job %s not found in DB — aborting.", job_id)
+    """Single-instance background worker with durable per-keyword results."""
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
             return
-
-        logger.info(
-            "Starting job %s | company=%r domain=%r depth=%d provider=%r",
-            job_id, job.company_name, job.domain, job.depth, job.provider,
-        )
-
-        job.status = JobStatus.processing.value
-        db.commit()
-
-        # Engage selected provider (mock, free, or serpapi)
-        provider = get_provider(job.provider)
-
-        tasks = (
-            db.query(KeywordTask)
-            .filter(
-                KeywordTask.job_id == job_id,
-                KeywordTask.status == KeywordStatus.pending.value,
-            )
-            .all()
-        )
-
-        total = len(tasks)
-        logger.info("Job %s — processing %d keywords with provider %s", job_id, total, type(provider).__name__)
-
-        all_collected_ranks: List[Optional[int]] = []
-        all_competitors_by_keyword: List[List[str]] = []
-
-        for idx, task in enumerate(tasks, start=1):
-            logger.info(
-                "[%d/%d] Searching: %r | country=%s lang=%s device=%s target=%s",
-                idx, total, task.keyword, task.country, task.language, task.device, job.domain,
-            )
-
-            # Query historical rank delta if this domain has been scanned before
-            prev_rank = _find_previous_rank(
-                db=db,
-                current_job_id=job_id,
-                target_domain=job.domain,
-                keyword=task.keyword,
-                country=task.country,
-                language=task.language,
-                device=task.device,
-            )
-            task.previous_rank = prev_rank
-
-            # ── Retry loop with exponential backoff ──────────────────────
-            response = None
-            for attempt in range(MAX_RETRIES + 1):
-                response = provider.search(
-                    keyword=task.keyword,
-                    country=task.country,
-                    language=task.language,
-                    device=task.device,
-                    depth=job.depth,
-                    target_domain=job.domain,
-                )
-
-                if response.status not in ("rate_limited", "timeout"):
-                    break
-
-                wait = RETRY_BACKOFF[min(attempt, len(RETRY_BACKOFF) - 1)]
-                logger.warning(
-                    "  [%s] for %r — retry %d/%d in %ds",
-                    response.status, task.keyword, attempt + 1, MAX_RETRIES, wait,
-                )
-                time.sleep(wait)
-
-            # ── Process SERP Intelligence ────────────────────────────────
-            if response.status == "success":
-                intel = analyze_serp_intelligence(job.domain, response.results)
-
-                best_rank = intel["best_rank"]
-                task.rank = best_rank
-                task.ranking_url = intel["best_url"]
-                task.page_title = intel["best_title"]
-                task.matching_urls_count = intel["matching_urls_count"]
-                task.secondary_ranking_url = intel["secondary_url"]
-                task.secondary_rank = intel["secondary_rank"]
-                task.top_competitors_json = json.dumps(intel["top_5_competitors"])
-
-                # Calculate rank delta (positive = climbed in rankings, e.g. 8 -> 3 = +5)
-                if best_rank is not None and prev_rank is not None:
-                    task.rank_delta = prev_rank - best_rank
-                elif best_rank is not None and prev_rank is None:
-                    task.rank_delta = None  # UI will display "NEW"
-                elif best_rank is None and prev_rank is not None:
-                    task.rank_delta = None  # Dropped from rankings
-
-                if best_rank is not None:
-                    task.status = KeywordStatus.found.value
-                    logger.info("  → Found at rank %d (delta: %s): %s", best_rank, task.rank_delta, task.ranking_url)
-                else:
-                    task.status = KeywordStatus.not_found.value
-                    logger.info("  → Not found in top %d results", job.depth)
-
-                all_collected_ranks.append(best_rank)
-                all_competitors_by_keyword.append(intel["page_1_competitors"])
-
-            elif response.status == "rate_limited":
-                task.status = KeywordStatus.rate_limited.value
-                logger.warning("  → Permanently rate limited for %r after %d retries", task.keyword, MAX_RETRIES)
-                all_collected_ranks.append(None)
-
-            elif response.status == "timeout":
-                task.status = KeywordStatus.timeout.value
-                logger.warning("  → Timeout for %r after %d retries", task.keyword, MAX_RETRIES)
-                all_collected_ranks.append(None)
-
-            else:
-                task.status = KeywordStatus.api_error.value
-                logger.error("  → API error for %r: %s", task.keyword, response.error)
-                all_collected_ranks.append(None)
-
+        try:
+            job.status = JobStatus.processing.value
             db.commit()
-
-            # Throttle slightly between requests (except when using mock which already has latency)
-            if idx < total and job.provider != "mock":
-                time.sleep(REQUEST_DELAY)
-
-        # ── Compute Job-Level High-Value SEO Metrics ─────────────────
-        job.visibility_score = calculate_visibility_score(all_collected_ranks)
-        top_competitors = aggregate_top_competitors(all_competitors_by_keyword, total)
-        job.top_competitors_summary = json.dumps(top_competitors)
-
-        job.status = JobStatus.completed.value
-        db.commit()
-        logger.info(
-            "Job %s completed successfully. Visibility Score: %.1f%% | Top Competitors: %s",
-            job_id, job.visibility_score, [c['domain'] for c in top_competitors],
-        )
-
-    except Exception as exc:
-        logger.exception("Unhandled exception in job %s: %s", job_id, exc)
-        if job:
-            db.rollback()
-            try:
-                job.status = JobStatus.failed.value
+            provider = get_provider(job.provider, allow_fallback=job.allow_fallback)
+            tasks = db.query(KeywordTask).filter_by(job_id=job_id).order_by(KeywordTask.id).all()
+            pending = [task for task in tasks if task.status == KeywordStatus.pending.value]
+            for index, task in enumerate(pending):
+                response = None
+                for attempt in range(MAX_RETRIES + 1):
+                    try:
+                        response = provider.search(
+                            keyword=task.keyword, country=task.country, language=task.language,
+                            device=task.device, depth=job.depth, target_domain=job.domain,
+                        )
+                    except Exception:
+                        logger.exception("Provider failed for task %s", task.id)
+                        response = SearchResponse(keyword=task.keyword, results=[], status="api_error",
+                                                  error="Search provider could not complete this request.")
+                    if response.status not in {"rate_limited", "timeout"} or attempt == MAX_RETRIES:
+                        break
+                    time.sleep(RETRY_BACKOFF[attempt])
+                task.actual_provider = response.actual_provider
+                if task.actual_provider == "unknown" and response.status != "success":
+                    task.actual_provider = job.provider
+                task.fallback_used = response.fallback_used
+                task.fallback_reason = response.fallback_reason
+                task.coverage_complete = response.coverage_complete
+                task.results_examined = len(response.results)
+                task.effective_country = response.effective_country
+                task.effective_language = response.effective_language
+                task.effective_device = response.effective_device
+                task.observed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                task.error_message = response.error
+                if response.status == "success":
+                    intel = analyze_serp_intelligence(job.domain, response.results)
+                    task.rank = intel["best_rank"]
+                    task.ranking_url = intel["best_url"]
+                    task.page_title = intel["best_title"]
+                    task.matching_urls_count = intel["matching_urls_count"]
+                    task.secondary_ranking_url = intel["secondary_url"]
+                    task.secondary_rank = intel["secondary_rank"]
+                    task.top_competitors_json = json.dumps(intel["top_5_competitors"])
+                    task.page_1_competitors_json = json.dumps(intel["page_1_competitors"])
+                    task.status = "found" if task.rank is not None else "not_found" if task.coverage_complete else "incomplete"
+                else:
+                    task.status = response.status if response.status in ERROR_STATES else "api_error"
+                    task.error_message = task.error_message or "Search request failed."
+                compare_previous_observation(db, job, task)
+                update_job_summary(job, tasks)
                 db.commit()
-            except Exception as inner_exc:
-                logger.error("Failed to update job status to failed: %s", inner_exc)
-    finally:
-        db.close()
+                if index < len(pending) - 1 and job.provider != "mock":
+                    time.sleep(REQUEST_DELAY)
+            errors = sum(task.status in ERROR_STATES for task in tasks)
+            partial = any(task.coverage_complete is not True for task in tasks)
+            job.status = "failed" if errors == len(tasks) else "completed_with_errors" if errors or partial else "completed"
+            job.error_message = "No keyword requests succeeded." if errors == len(tasks) else None
+            update_job_summary(job, tasks)
+            db.commit()
+        except Exception:
+            logger.exception("Scan %s failed", job_id)
+            db.rollback()
+            job = db.get(Job, job_id)
+            if job is not None:
+                job.status = JobStatus.failed.value
+                job.error_message = "Scan interrupted by an internal error. Completed results have been preserved."
+                db.query(KeywordTask).filter_by(job_id=job_id, status="pending").update({
+                    "status": "api_error", "error_message": "Not processed because the scan was interrupted."
+                })
+                db.commit()

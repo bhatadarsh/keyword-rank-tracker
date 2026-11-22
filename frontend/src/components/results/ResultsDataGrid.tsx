@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search, Download, ClipboardCopy, Check, AlertTriangle,
   ExternalLink, ChevronRight, X, ArrowUpRight, ArrowDownRight,
@@ -23,11 +24,22 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
   onFilterOpportunities,
   onExpandRow,
 }) => {
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<StatusFilter>('all');
-  const [sortCol, setSortCol] = useState<SortCol>('rank');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [selectedResult, setSelectedResult] = useState<Result | null>(null);
+  const [params, setParams] = useSearchParams();
+  const search = params.get('q') || '';
+  const allowedFilters: StatusFilter[] = ['all', 'opportunities', 'page1', 'cannibalization', 'deltas', 'not_found', 'errors'];
+  const filter = allowedFilters.includes(params.get('filter') as StatusFilter) ? params.get('filter') as StatusFilter : 'all';
+  const sortCol: SortCol = ['keyword', 'rank', 'delta'].includes(params.get('sort') || '') ? params.get('sort') as SortCol : 'rank';
+  const sortDir: SortDir = params.get('dir') === 'desc' ? 'desc' : 'asc';
+  const updateQuery = (values: Record<string, string>, replace = false) => setParams((previous) => {
+    const next = new URLSearchParams(previous);
+    for (const [key, value] of Object.entries(values)) {
+      if (value) next.set(key, value); else next.delete(key);
+    }
+    return next;
+  }, { replace });
+  const setSearch = (value: string) => updateQuery({ q: value }, true);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selectedResult = results.find((row) => row.id === selectedId) || null;
   const [copiedBrief, setCopiedBrief] = useState(false);
   const [clipCopied, setClipCopied] = useState(false);
 
@@ -42,7 +54,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
     if (filter === 'cannibalization') return r.cannibalization;
     if (filter === 'deltas') return r.rank_delta !== null && r.rank_delta !== 0;
     if (filter === 'not_found') return r.status === 'not_found';
-    if (filter === 'errors') return ['api_error', 'rate_limited', 'timeout'].includes(r.status);
+    if (filter === 'errors') return ['api_error', 'rate_limited', 'timeout', 'invalid', 'incomplete'].includes(r.status);
     return true;
   });
 
@@ -63,22 +75,21 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
 
   const toggleSort = (col: SortCol) => {
     if (sortCol === col) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      updateQuery({ dir: sortDir === 'asc' ? 'desc' : 'asc' });
     } else {
-      setSortCol(col);
-      setSortDir('asc');
+      updateQuery({ sort: col, dir: 'asc' });
     }
   };
 
   const handleSelectFilter = (f: StatusFilter) => {
-    setFilter(f);
+    updateQuery({ filter: f });
     if (f === 'opportunities' && onFilterOpportunities) {
       onFilterOpportunities();
     }
   };
 
   const handleOpenRow = (res: Result) => {
-    setSelectedResult(res);
+    setSelectedId(res.id);
     if (onExpandRow) {
       onExpandRow();
     }
@@ -86,17 +97,19 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
 
   // Copy filtered table to clipboard (TSV formatted for Google Sheets)
   const handleCopyTSV = () => {
-    const header = 'Keyword\tRank\tPrevious Rank\tDelta\tRanking URL\tCannibalization\tPage Title\tStatus';
+    const header = 'Keyword\tRank\tPrevious Rank\tDelta\tRanking URL\tCannibalization\tPage Title\tStatus\tActual Source\tFallback Used\tFallback Reason\tCoverage Complete';
     const rows = sorted.map((r) =>
       [
         r.keyword,
-        r.rank ?? 'Not Found',
+        r.rank ?? r.status,
         r.previous_rank ?? '—',
-        r.rank_delta !== null ? (r.rank_delta > 0 ? `+${r.rank_delta}` : r.rank_delta) : 'NEW',
+        r.rank_delta !== null ? (r.rank_delta > 0 ? `+${r.rank_delta}` : r.rank_delta) : r.comparison_status,
         r.ranking_url ?? '',
         r.cannibalization ? 'Yes (2+ URLs)' : 'No',
         r.page_title ?? '',
         r.status,
+        r.actual_provider, r.fallback_used === null ? 'Unknown' : String(r.fallback_used),
+        r.fallback_reason || '', r.coverage_complete === null ? 'Unknown' : String(r.coverage_complete),
       ].join('\t')
     );
     navigator.clipboard.writeText([header, ...rows].join('\n'));
@@ -117,7 +130,9 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
       `Act as a Principal SEO Strategist & Technical Auditor.\n\n` +
       `Target Domain: ${domain}\n` +
       `Keyword: "${res.keyword}"\n` +
-      `Current Organic Position: ${res.rank ? `#${res.rank}` : 'Unranked'}\n` +
+      `Source: ${res.actual_provider}; simulation fallback: ${String(res.fallback_used)}\n` +
+      `Coverage complete: ${String(res.coverage_complete)}; results examined: ${res.results_examined}\n` +
+      `Current Organic Position: ${res.rank ? `#${res.rank}` : res.status}\n` +
       `Current Ranking URL: ${res.ranking_url || 'None'}\n` +
       `Page Title: ${res.page_title || 'None'}\n` +
       (res.cannibalization
@@ -229,6 +244,10 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
           >
             Not Found
           </button>
+          <button type="button" onClick={() => handleSelectFilter('errors')}
+            aria-pressed={filter === 'errors'} className="px-3 py-1.5 text-xs font-medium whitespace-nowrap text-rose-700 dark:text-rose-300">
+            Errors / incomplete
+          </button>
         </div>
 
         {/* Search & Export Toolbar */}
@@ -311,7 +330,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                 </th>
                 <th className="py-3 px-4">Ranking URL</th>
                 <th className="py-3 px-4 hidden lg:table-cell">Page Title</th>
-                <th className="py-3 px-3 hidden sm:table-cell">Locale / Device</th>
+                <th className="py-3 px-3 hidden sm:table-cell">Requested Locale / Device</th>
                 <th className="py-3 px-4 text-right">SERP X-Ray</th>
               </tr>
             </thead>
@@ -378,9 +397,9 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                               <Minus className="w-3 h-3" />
                             </span>
                           )
-                        ) : res.rank !== null && res.previous_rank === null ? (
+                        ) : ['first_seen', 'newly_found', 'dropped'].includes(res.comparison_status) ? (
                           <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 px-1.5 py-0.2 rounded">
-                            NEW
+                            {res.comparison_status === 'first_seen' ? 'FIRST' : res.comparison_status === 'dropped' ? 'DROPPED' : 'NEW'}
                           </span>
                         ) : (
                           <span className="text-zinc-400">—</span>
@@ -400,6 +419,11 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                             </span>
                           )}
                         </div>
+                        <p className="mt-1 text-[11px] font-normal text-zinc-600 dark:text-zinc-300">
+                          {res.status === 'pending' ? 'Waiting to be processed' : res.actual_provider}
+                          {res.fallback_used ? ' · Simulated fallback' : res.actual_provider === 'mock' ? ' · Synthetic' : ''}
+                          {res.status !== 'pending' && res.coverage_complete === false ? ' · Partial coverage' : ''}
+                        </p>
                       </td>
 
                       {/* Ranking URL */}
@@ -409,7 +433,11 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                             {res.ranking_url}
                           </span>
                         ) : (
-                          <span className="text-zinc-400 italic">Not in top results</span>
+                          <span className="text-zinc-600 dark:text-zinc-300" title={res.error_message || undefined}>
+                            {res.status === 'pending' ? 'Pending' : res.status === 'not_found' ? 'Not found within searched depth'
+                              : res.status === 'incomplete' ? 'Not found in retrieved results'
+                              : res.error_message || res.status.replaceAll('_', ' ')}
+                          </span>
                         )}
                       </td>
 
@@ -460,7 +488,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div
             className="fixed inset-0"
-            onClick={() => setSelectedResult(null)}
+            onClick={() => setSelectedId(null)}
           />
 
           <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl overflow-hidden z-10 flex flex-col max-h-[90vh]">
@@ -481,13 +509,13 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                   &ldquo;{selectedResult.keyword}&rdquo;
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Target Domain: <span className="font-mono text-zinc-700 dark:text-zinc-300">{domain}</span> • {selectedResult.country} ({selectedResult.device})
+                  Target Domain: <span className="font-mono text-zinc-700 dark:text-zinc-300">{domain}</span> • Requested: {selectedResult.country} ({selectedResult.device})
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => setSelectedResult(null)}
+                onClick={() => setSelectedId(null)}
                 className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -496,6 +524,14 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
 
             {/* Body */}
             <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="text-xs space-y-1 text-zinc-700 dark:text-zinc-300">
+                <p>Source: {selectedResult.actual_provider}{selectedResult.actual_provider === 'mock' ? ' (synthetic)' : ''}</p>
+                <p>Status: {selectedResult.status.replaceAll('_', ' ')} · {selectedResult.results_examined} results examined</p>
+                <p>Coverage: {selectedResult.coverage_complete === null ? 'Unknown' : selectedResult.coverage_complete ? 'Complete' : 'Partial'}</p>
+                <p>Effective settings: {selectedResult.effective_country || 'Country unspecified'} · {selectedResult.effective_language || 'Language unspecified'} · {selectedResult.effective_device || 'Device unspecified'}</p>
+                {selectedResult.fallback_used && <p>Simulation fallback: {selectedResult.fallback_reason}</p>}
+                {selectedResult.error_message && <p role="alert">{selectedResult.error_message}</p>}
+              </div>
               {/* Primary vs Secondary Ranking Details */}
               <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 space-y-2">
                 <div className="flex items-center justify-between">
@@ -503,7 +539,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                     Your Best Ranking Position
                   </span>
                   <span className="text-xs font-mono font-semibold text-blue-600 dark:text-blue-400">
-                    {selectedResult.rank ? `Rank #${selectedResult.rank}` : 'Unranked'}
+                    {selectedResult.rank ? `Rank #${selectedResult.rank}` : selectedResult.status.replaceAll('_', ' ')}
                   </span>
                 </div>
 
@@ -521,7 +557,10 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                     </a>
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-400">Domain was not found within searched depth.</p>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-300">{selectedResult.status === 'not_found'
+                    ? 'Domain was not found within searched depth.' : selectedResult.status === 'incomplete'
+                      ? 'Domain was not found in the retrieved results. Requested depth was not fully checked.'
+                      : selectedResult.status === 'pending' ? 'This keyword has not been processed yet.' : 'A verified ranking is unavailable.'}</p>
                 )}
 
                 {/* Secondary URL if cannibalized */}
@@ -554,7 +593,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
               {/* Top 5 SERP Competitors Snapshot */}
               <div className="space-y-2">
                 <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                  Top 5 Organic Competitors on Google
+                  Top 5 SERP results ({selectedResult.actual_provider})
                 </span>
 
                 <div className="space-y-1.5">
@@ -614,7 +653,7 @@ export const ResultsDataGrid: React.FC<ResultsDataGridProps> = ({
                 rel="noopener noreferrer"
                 className="w-full sm:w-auto px-3.5 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-lg transition-colors flex items-center justify-center gap-1.5"
               >
-                <span>Verify Live on Google</span>
+                <span>Search on Google</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
 

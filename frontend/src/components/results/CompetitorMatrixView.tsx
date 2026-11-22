@@ -23,7 +23,7 @@ export const CompetitorMatrixView: React.FC<CompetitorMatrixViewProps> = ({
             Competitor SERP Share-of-Voice Matrix
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Aggregated Page 1 real estate captured by external domains across your monitored keyword set.
+            Percentage of complete, comparable keyword observations where each domain appears in the top 10.
           </p>
         </div>
         <div className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 font-mono">
@@ -51,7 +51,7 @@ export const CompetitorMatrixView: React.FC<CompetitorMatrixViewProps> = ({
                 {comp.domain}
               </h4>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Owns <span className="font-mono font-medium text-zinc-800 dark:text-zinc-200">{comp.count}</span> keywords on Page 1
+                Appears in the top 10 for <span className="font-mono font-medium text-zinc-800 dark:text-zinc-200">{comp.count}</span> keywords
               </p>
             </div>
 
@@ -59,7 +59,7 @@ export const CompetitorMatrixView: React.FC<CompetitorMatrixViewProps> = ({
               <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
                 <div
                   className="bg-blue-600 h-full rounded-full"
-                  style={{ width: `${Math.min(100, comp.share_pct * 2)}%` }}
+                  style={{ width: `${Math.min(100, comp.share_pct)}%` }}
                 />
               </div>
             </div>
@@ -69,7 +69,7 @@ export const CompetitorMatrixView: React.FC<CompetitorMatrixViewProps> = ({
 
       {topCompetitors.length === 0 && (
         <div className="p-12 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
-          No competitor data aggregated yet. Run a scan with Page 1 results to populate this matrix.
+          Aggregate coverage is unavailable or no external competitors were found. Partial keyword snapshots remain below.
         </div>
       )}
 
@@ -94,8 +94,8 @@ export const CompetitorMatrixView: React.FC<CompetitorMatrixViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
-              {results.slice(0, 15).map((r) => {
-                const topComp = r.top_competitors && r.top_competitors[0];
+              {results.map((r) => {
+                const topComp = r.top_competitors?.find((comp) => !comp.is_target);
                 return (
                   <tr key={r.id || r.keyword} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
                     <td className="py-2.5 px-3 font-medium text-zinc-900 dark:text-zinc-100">{r.keyword}</td>

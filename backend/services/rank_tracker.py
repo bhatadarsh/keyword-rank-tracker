@@ -160,7 +160,9 @@ def analyze_serp_intelligence(
 
     # Page 1 (Top 10) competitor domains
     page_1_competitors = []
-    for res in sorted_results[:10]:
+    for res in sorted_results:
+        if res.rank > 10:
+            continue
         if not match_domain(target_domain, res.url):
             dom = res.domain or normalize_domain(res.url)
             if dom:
@@ -186,7 +188,7 @@ def aggregate_top_competitors(
     Aggregates top non-target domains dominating Page 1 SERPs across the entire job.
     Returns the top 5 competitors with appearance count and SERP share percentage.
     """
-    flat_domains = [d for sublist in competitor_lists for d in sublist]
+    flat_domains = [d for sublist in competitor_lists for d in set(sublist)]
     counts = Counter(flat_domains)
 
     top_5 = []

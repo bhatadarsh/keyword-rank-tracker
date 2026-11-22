@@ -1,4 +1,4 @@
-export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
+export type JobStatus = 'queued' | 'processing' | 'completed' | 'completed_with_errors' | 'failed';
 
 export type KeywordStatus =
   | 'pending'
@@ -7,9 +7,10 @@ export type KeywordStatus =
   | 'api_error'
   | 'rate_limited'
   | 'timeout'
-  | 'invalid';
+  | 'invalid'
+  | 'incomplete';
 
-export type ViewType = 'new-scan' | 'opportunities' | 'competitors' | 'history' | 'help';
+export type ViewType = 'new-scan' | 'rankings' | 'opportunities' | 'competitors' | 'history' | 'help';
 
 export interface OnboardingState {
   demoRun: boolean;
@@ -60,12 +61,27 @@ export interface Result {
   language: string;
   device: string;
   top_competitors: CompetitorItem[];
+  actual_provider: string;
+  fallback_used: boolean | null;
+  fallback_reason: string | null;
+  observed_at: string | null;
+  results_examined: number;
+  coverage_complete: boolean | null;
+  effective_country: string | null;
+  effective_language: string | null;
+  effective_device: string | null;
+  error_message: string | null;
+  previous_status: string | null;
+  comparison_status: 'first_seen' | 'newly_found' | 'dropped' | 'up' | 'down' | 'unchanged' | 'unavailable';
 }
 
 export interface Progress {
   total: number;
   completed: number;
   percent: number;
+  errors: number;
+  incomplete: number;
+  partial: number;
 }
 
 export interface JobDetails {
@@ -78,7 +94,14 @@ export interface JobDetails {
   language: string;
   device: string;
   depth: number;
-  visibility_score: number;
+  visibility_score: number | null;
+  actual_provider: string;
+  allow_fallback: boolean;
+  fallback_used: boolean | null;
+  fallback_reason: string | null;
+  fallback_count: number;
+  error_message: string | null;
+  metrics_sample_size: number;
   top_competitors_summary: TopCompetitorSummary[];
   created_at: string | null;
   progress: Progress;
@@ -98,7 +121,10 @@ export interface HistoryJob {
   keyword_count: number;
   found_count: number;
   cannibalized_count: number;
-  visibility_score: number;
+  visibility_score: number | null;
+  actual_provider: string;
+  fallback_used: boolean | null;
+  fallback_count: number;
   top_competitors: TopCompetitorSummary[];
   created_at: string | null;
 }
@@ -109,6 +135,10 @@ export interface ProviderOption {
   tag: string;
   status: string;
   description: string;
+  supports_locale: boolean;
+  supports_device: boolean;
+  supports_fallback: boolean;
+  depths: number[];
 }
 
 export interface ConfigResponse {
@@ -117,6 +147,16 @@ export interface ConfigResponse {
   has_serpapi_key: boolean;
   countries: string[];
   languages: string[];
+  max_upload_bytes: number;
+  max_rows: number;
+}
+
+export interface UploadPreview {
+  row_count: number;
+  columns: string[];
+  sample_rows: string[];
+  blank_rows: number;
+  duplicates: number;
 }
 
 export interface ToastItem {

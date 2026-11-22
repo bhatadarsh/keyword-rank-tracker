@@ -14,7 +14,13 @@ export function useOnboarding() {
   const [completedSteps, setCompletedSteps] = useState<OnboardingState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_PROGRESS_KEY);
-      return saved ? JSON.parse(saved) : INITIAL_STATE;
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return INITIAL_STATE;
+      return {
+        demoRun: parsed.demoRun === true,
+        opportunitiesViewed: parsed.opportunitiesViewed === true,
+        xrayInspected: parsed.xrayInspected === true,
+      };
     } catch {
       return INITIAL_STATE;
     }

@@ -1,406 +1,224 @@
-import uuid
-import logging
-import re
-import json
-import io
-import os
 import glob
+import json
+import os
+import re
+import uuid
+from datetime import timezone
 from typing import Optional
 
-import pandas as pd
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Job, KeywordTask, KeywordStatus, JobStatus
-from services.job_processor import process_job
 from exports.generator import generate_csv, generate_excel
-from services.rank_tracker import normalize_domain
+from models import Job, KeywordTask
 from providers.serpapi_provider import COUNTRY_MAP, LANGUAGE_MAP
-
-logger = logging.getLogger(__name__)
+from services.ingestion import MAX_ROWS, MAX_UPLOAD_BYTES, read_keyword_upload, validate_settings
+from services.job_processor import process_job, ERROR_STATES
+from services.rank_tracker import normalize_domain
 
 router = APIRouter(prefix="/api/rank-check", tags=["rank-check"])
 config_router = APIRouter(prefix="/api/config", tags=["config"])
-
 ALLOWED_DEPTHS = {100, 200, 500}
-ALLOWED_DEVICES = {"desktop", "mobile"}
 ALLOWED_PROVIDERS = {"mock", "free", "serpapi"}
+TERMINAL = {"completed", "completed_with_errors", "failed"}
 
 
-# ── Configuration Endpoint (Single Source of Truth) ──────────────────────────
-
-@config_router.get("", summary="Get platform configuration, providers, and locales")
-@router.get("/config", summary="Get platform configuration (alias)")
+@config_router.get("")
+@router.get("/config")
 def get_config():
-    """Returns supported search providers, countries, and languages."""
-    has_serp_key = bool(os.getenv("SERP_API_KEY", "").strip())
-    default_provider = os.getenv("SERP_PROVIDER", "free").lower().strip()
-    if default_provider not in ALLOWED_PROVIDERS:
-        default_provider = "mock"
-
-    # Distinct, clean country names
-    excluded_aliases = {"us", "uk", "usa"}
-    countries = sorted(
-        {
-            k.title()
-            for k in COUNTRY_MAP.keys()
-            if k not in excluded_aliases and len(k) > 2
-        }
-    )
-    # Ensure standard head countries are at top
-    priority_countries = ["United States", "India", "United Kingdom", "Canada", "Australia", "Germany"]
-    clean_countries = [c for c in priority_countries if c in countries] + [
-        c for c in countries if c not in priority_countries
-    ]
-
-    languages = sorted({k.title() for k in LANGUAGE_MAP.keys()})
-
+    has_key = bool(os.getenv("SERP_API_KEY", "").strip())
+    default = os.getenv("SERP_PROVIDER", "free").lower().strip()
+    if default not in ALLOWED_PROVIDERS or (default == "serpapi" and not has_key):
+        default = "free"
+    countries = sorted({key.title() for key in COUNTRY_MAP if key not in {"us", "uk", "usa", "uae"}})
+    priority = ["United States", "India", "United Kingdom", "Canada", "Australia", "Germany"]
     providers = [
-        {
-            "id": "free",
-            "name": "Free Live Search (0 Cost)",
-            "tag": "100% Free",
-            "status": "ready",
-            "description": "Zero-key live search via DuckDuckGo Lite & SearXNG with smart fallback",
-        },
-        {
-            "id": "mock",
-            "name": "Smart Simulation (0 Cost)",
-            "tag": "Fast & Offline",
-            "status": "ready",
-            "description": "Deterministic simulation with cannibalization & competitor modeling",
-        },
-        {
-            "id": "serpapi",
-            "name": "SerpApi (Paid Key)",
-            "tag": "Key Active" if has_serp_key else "Key Required",
-            "status": "ready" if has_serp_key else "unconfigured",
-            "description": "Official Google SERP API with multi-page pagination for Depth > 100",
-        },
+        dict(id="free", name="Free Live Search", tag="No key", status="ready",
+             description="DuckDuckGo or configured SearXNG. Limited coverage; locale and device are not applied.",
+             supports_locale=False, supports_device=False, depths=[100], supports_fallback=True),
+        dict(id="mock", name="Simulation", tag="Offline", status="ready",
+             description="Synthetic rankings for demonstrations and testing.",
+             supports_locale=True, supports_device=True, depths=[100, 200, 500], supports_fallback=False),
+        dict(id="serpapi", name="SerpApi", tag="Key active" if has_key else "Key required",
+             status="ready" if has_key else "unconfigured", description="Google results supplied by SerpApi.",
+             supports_locale=True, supports_device=True, depths=[100, 200, 500], supports_fallback=False),
     ]
-
-    return {
-        "providers": providers,
-        "default_provider": default_provider,
-        "has_serpapi_key": has_serp_key,
-        "countries": clean_countries,
-        "languages": languages,
-    }
-
-
-# ── History / List Jobs ───────────────────────────────────────────────────────
-
-@router.get("", summary="List all jobs (history)")
-def list_jobs(db: Session = Depends(get_db)):
-    """Return the 50 most recent jobs with aggregate counts and visibility scores."""
-    jobs = db.query(Job).order_by(Job.created_at.desc()).limit(50).all()
-    result = []
-    for job in jobs:
-        tasks = db.query(KeywordTask).filter(KeywordTask.job_id == job.id).all()
-        found = sum(1 for t in tasks if t.status == KeywordStatus.found.value)
-        cannibalized = sum(1 for t in tasks if (t.matching_urls_count and t.matching_urls_count >= 2))
-
-        top_comps = []
-        if job.top_competitors_summary:
-            try:
-                top_comps = json.loads(job.top_competitors_summary)
-            except Exception:
-                pass
-
-        result.append({
-            "job_id": job.id,
-            "company_name": job.company_name,
-            "domain": job.domain,
-            "provider": job.provider or "mock",
-            "status": job.status,
-            "country": job.country,
-            "language": job.language,
-            "device": job.device,
-            "depth": job.depth,
-            "keyword_count": len(tasks),
-            "found_count": found,
-            "cannibalized_count": cannibalized,
-            "visibility_score": job.visibility_score or 0.0,
-            "top_competitors": top_comps,
-            "created_at": job.created_at.isoformat() if job.created_at else None,
-        })
-    return result
+    return dict(providers=providers, default_provider=default, has_serpapi_key=has_key,
+                countries=priority + [country for country in countries if country not in priority],
+                languages=["English"] + sorted({key.title() for key in LANGUAGE_MAP if key != "english"}),
+                max_upload_bytes=MAX_UPLOAD_BYTES, max_rows=MAX_ROWS)
 
 
 def _clean_domain(raw: str) -> str:
-    """Normalise a user-provided domain string."""
     return normalize_domain(raw.strip())
 
 
 def _validate_domain(domain: str) -> bool:
-    """Basic domain format check."""
-    pattern = r"^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$"
-    return bool(re.match(pattern, domain, re.IGNORECASE))
+    return bool(re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}", domain, re.I))
 
 
-# ── Create / Queue Job ────────────────────────────────────────────────────────
+def timestamp(value):
+    return value.replace(tzinfo=timezone.utc).isoformat() if value else None
 
-@router.post("", summary="Start a new rank check job")
-async def create_job(
-    background_tasks: BackgroundTasks,
-    company_name: str = Form(..., description="Company name (e.g. GitHub)"),
-    domain: str = Form(..., description="Domain to track (e.g. github.com)"),
-    country: str = Form(..., description="Target country (e.g. United States)"),
-    language: str = Form(..., description="Target language (e.g. English)"),
-    device: str = Form(..., description="desktop or mobile"),
-    depth: int = Form(100, description="Search depth: 100, 200, or 500"),
-    provider: Optional[str] = Form(None, description="mock, free, or serpapi"),
-    file: UploadFile = File(..., description="CSV or Excel file with keywords"),
-    db: Session = Depends(get_db),
-):
-    # ── Input validation ──────────────────────────────────────────────────────
-    if not company_name.strip():
-        raise HTTPException(status_code=422, detail="company_name cannot be empty.")
 
-    cleaned_domain = _clean_domain(domain)
-    if not cleaned_domain or not _validate_domain(cleaned_domain):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid domain: '{domain}'. Provide a bare domain like 'github.com'.",
-        )
-
-    if device.lower() not in ALLOWED_DEVICES:
-        raise HTTPException(
-            status_code=422, detail=f"device must be one of: {sorted(ALLOWED_DEVICES)}"
-        )
-
-    if depth not in ALLOWED_DEPTHS:
-        raise HTTPException(
-            status_code=422, detail=f"depth must be one of: {sorted(ALLOWED_DEPTHS)}"
-        )
-
-    # Provider selection
-    selected_provider = (provider or os.getenv("SERP_PROVIDER", "free")).lower().strip()
-    if selected_provider not in ALLOWED_PROVIDERS:
-        selected_provider = "mock"
-
-    # ── Parse uploaded file ───────────────────────────────────────────────────
-    contents = await file.read()
-    filename = (file.filename or "").lower()
-
+def json_list(value):
     try:
-        if filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(contents))
-        elif filename.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(io.BytesIO(contents))
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported file type. Please upload a .csv, .xls, or .xlsx file.",
-            )
+        parsed = json.loads(value or "[]")
+        return parsed if isinstance(parsed, list) else []
+    except (ValueError, TypeError):
+        return []
 
-        # Normalise column headers
-        df.columns = [str(c).lower().strip() for c in df.columns]
 
-        if "keyword" not in df.columns:
-            raise HTTPException(
-                status_code=400,
-                detail="File must contain a 'keyword' column.",
-            )
+def serialize_task(task):
+    fields = ("id", "keyword", "rank", "previous_rank", "rank_delta", "ranking_url", "page_title",
+              "secondary_ranking_url", "secondary_rank", "status", "country", "language", "device",
+              "fallback_used", "fallback_reason", "coverage_complete", "effective_country",
+              "effective_language", "effective_device", "error_message", "previous_status")
+    data = {field: getattr(task, field) for field in fields}
+    data.update(actual_provider=task.actual_provider or "unknown",
+                comparison_status=task.comparison_status or "unavailable",
+                observed_at=timestamp(task.observed_at), results_examined=task.results_examined or 0,
+                matching_urls_count=task.matching_urls_count or 0,
+                cannibalization=(task.matching_urls_count or 0) >= 2,
+                top_competitors=json_list(task.top_competitors_json))
+    # Legacy deltas have no verified provenance; preserve raw DB history but don't present them as trustworthy.
+    if data["actual_provider"] == "unknown":
+        data.update(rank_delta=None, previous_rank=None, previous_status=None, comparison_status="unavailable",
+                    fallback_used=None, coverage_complete=None)
+    return data
 
-    except HTTPException:
+
+def serialize_job(job, tasks):
+    completed = sum(task.status != "pending" for task in tasks)
+    known = job.actual_provider not in {None, "unknown"}
+    score = job.visibility_score if known else None
+    return dict(job_id=job.id, status=job.status, company_name=job.company_name, domain=job.domain,
+                provider=job.provider or "unknown", actual_provider=job.actual_provider or "unknown",
+                allow_fallback=job.allow_fallback, fallback_used=job.fallback_used if known else None,
+                fallback_reason=job.fallback_reason, fallback_count=sum(bool(task.fallback_used) for task in tasks),
+                country=job.country, language=job.language, device=job.device, depth=job.depth,
+                error_message=job.error_message, visibility_score=score,
+                metrics_sample_size=job.metrics_sample_size or 0,
+                top_competitors_summary=json_list(job.top_competitors_summary) if known else [],
+                created_at=timestamp(job.created_at),
+                progress=dict(total=len(tasks), completed=completed,
+                              percent=round(completed / len(tasks) * 100) if tasks else 0,
+                              errors=sum(task.status in ERROR_STATES for task in tasks),
+                              incomplete=sum(task.status == "incomplete" for task in tasks),
+                              partial=sum(task.status != "pending" and task.coverage_complete is not True for task in tasks)),
+                results=[serialize_task(task) for task in tasks])
+
+
+@router.get("")
+def list_jobs(db: Session = Depends(get_db)):
+    jobs = db.query(Job).order_by(Job.created_at.desc()).limit(50).all()
+    result = []
+    for job in jobs:
+        tasks = db.query(KeywordTask).filter_by(job_id=job.id).all()
+        data = serialize_job(job, tasks)
+        data.pop("results")
+        data.update(keyword_count=len(tasks), found_count=sum(task.status == "found" for task in tasks),
+                    cannibalized_count=sum((task.matching_urls_count or 0) >= 2 for task in tasks),
+                    top_competitors=data.pop("top_competitors_summary"))
+        result.append(data)
+    return result
+
+
+@router.post("/preview")
+async def preview_upload(file: UploadFile = File(...), country: str = Form("United States"),
+                         language: str = Form("English"), device: str = Form("desktop")):
+    parsed = await read_keyword_upload(file, country, language, device)
+    parsed.pop("tasks")
+    return parsed
+
+
+@router.post("")
+async def create_job(background_tasks: BackgroundTasks, company_name: str = Form(...),
+                     domain: str = Form(...), country: str = Form(...), language: str = Form(...),
+                     device: str = Form(...), depth: int = Form(100), provider: Optional[str] = Form(None),
+                     allow_fallback: bool = Form(False), file: UploadFile = File(...),
+                     db: Session = Depends(get_db)):
+    if not company_name.strip() or len(company_name.strip()) > 200:
+        raise HTTPException(422, "Company name must contain 1-200 characters.")
+    cleaned_domain = _clean_domain(domain)
+    if len(cleaned_domain) > 253 or not _validate_domain(cleaned_domain):
+        raise HTTPException(422, "Provide a valid domain such as example.com.")
+    try:
+        country, language, device = validate_settings(country, language, device)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    selected = (provider or os.getenv("SERP_PROVIDER", "free")).strip().lower()
+    if selected not in ALLOWED_PROVIDERS:
+        raise HTTPException(422, "Choose free, mock, or serpapi as the provider.")
+    if selected == "serpapi" and not os.getenv("SERP_API_KEY", "").strip():
+        raise HTTPException(422, "SerpApi is not configured. Choose another provider or configure the API key.")
+    if depth not in ALLOWED_DEPTHS or (selected == "free" and depth != 100):
+        raise HTTPException(422, "Free search supports a single results batch (up to 100); other providers support 100, 200, or 500.")
+    if allow_fallback and selected != "free":
+        raise HTTPException(422, "Simulation fallback is only available for free live search.")
+    parsed = await read_keyword_upload(file, country, language, device)
+    job = Job(id=str(uuid.uuid4()), company_name=company_name.strip(), domain=cleaned_domain,
+              country=country, language=language, device=device, depth=depth, provider=selected,
+              allow_fallback=allow_fallback, status="queued")
+    try:
+        db.add(job)
+        db.flush()
+        db.add_all([KeywordTask(job_id=job.id, **task) for task in parsed["tasks"]])
+        db.commit()
+    except Exception:
+        db.rollback()
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Could not parse file: {exc}")
-
-    # ── Build keyword tasks ───────────────────────────────────────────────────
-    job_id = str(uuid.uuid4())
-    job = Job(
-        id=job_id,
-        company_name=company_name.strip(),
-        domain=cleaned_domain,
-        country=country.strip(),
-        language=language.strip(),
-        device=device.lower().strip(),
-        depth=depth,
-        provider=selected_provider,
-        status=JobStatus.queued.value,
-    )
-    db.add(job)
-    db.flush()
-
-    df = df.dropna(how="all")  # Drop entirely blank rows
-    seen = set()  # Deduplicate within batch
-    tasks = []
-
-    for _, row in df.iterrows():
-        kw = str(row.get("keyword", "")).strip()
-        if not kw or kw.lower() == "nan":
-            continue
-
-        kw_country = str(row["country"]).strip() if "country" in df.columns and pd.notna(row.get("country")) else country.strip()
-        kw_lang = str(row["language"]).strip() if "language" in df.columns and pd.notna(row.get("language")) else language.strip()
-        kw_device = str(row["device"]).strip().lower() if "device" in df.columns and pd.notna(row.get("device")) else device.lower().strip()
-
-        dedup_key = (kw.lower(), kw_country.lower(), kw_lang.lower(), kw_device)
-        if dedup_key in seen:
-            continue
-        seen.add(dedup_key)
-
-        tasks.append(
-            KeywordTask(
-                job_id=job_id,
-                keyword=kw,
-                country=kw_country,
-                language=kw_lang,
-                device=kw_device,
-            )
-        )
-
-    if not tasks:
-        raise HTTPException(status_code=400, detail="No valid keywords found in the uploaded file.")
-
-    db.add_all(tasks)
-    db.commit()
-
-    logger.info("Created job %s with %d keywords (domain=%r, provider=%r)", job_id, len(tasks), cleaned_domain, selected_provider)
-    background_tasks.add_task(process_job, job_id)
-
-    return {
-        "job_id": job_id,
-        "status": "queued",
-        "provider": selected_provider,
-        "keyword_count": len(tasks),
-        "domain": cleaned_domain,
-        "message": f"Job queued on {selected_provider.upper()} engine. Processing {len(tasks)} keywords.",
-    }
+    background_tasks.add_task(process_job, job.id)
+    return dict(job_id=job.id, status="queued", provider=selected, keyword_count=parsed["row_count"],
+                domain=cleaned_domain, message="Scan queued.", skipped_blank=parsed["blank_rows"],
+                duplicates_removed=parsed["duplicates"])
 
 
-# ── Job Status & Deep Analytics ───────────────────────────────────────────────
-
-@router.get("/{job_id}", summary="Get job status, SERP analytics, and results")
+@router.get("/{job_id}")
 def get_job_status(job_id: str, db: Session = Depends(get_db)):
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = db.get(Job, job_id)
     if not job:
-        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
-
-    tasks = db.query(KeywordTask).filter(KeywordTask.job_id == job_id).all()
-
-    total = len(tasks)
-    completed = sum(1 for t in tasks if t.status != KeywordStatus.pending.value)
-
-    results = []
-    for t in tasks:
-        top_comps = []
-        if t.top_competitors_json:
-            try:
-                top_comps = json.loads(t.top_competitors_json)
-            except Exception:
-                pass
-
-        results.append({
-            "id": t.id,
-            "keyword": t.keyword,
-            "rank": t.rank,
-            "previous_rank": t.previous_rank,
-            "rank_delta": t.rank_delta,
-            "ranking_url": t.ranking_url,
-            "page_title": t.page_title,
-            "matching_urls_count": t.matching_urls_count or 0,
-            "secondary_ranking_url": t.secondary_ranking_url,
-            "secondary_rank": t.secondary_rank,
-            "cannibalization": bool(t.matching_urls_count and t.matching_urls_count >= 2),
-            "status": t.status,
-            "country": t.country,
-            "language": t.language,
-            "device": t.device,
-            "top_competitors": top_comps,
-        })
-
-    top_comps_summary = []
-    if job.top_competitors_summary:
-        try:
-            top_comps_summary = json.loads(job.top_competitors_summary)
-        except Exception:
-            pass
-
-    return {
-        "job_id": job.id,
-        "status": job.status,
-        "company_name": job.company_name,
-        "domain": job.domain,
-        "provider": job.provider or "mock",
-        "country": job.country,
-        "language": job.language,
-        "device": job.device,
-        "depth": job.depth,
-        "visibility_score": job.visibility_score or 0.0,
-        "top_competitors_summary": top_comps_summary,
-        "created_at": job.created_at.isoformat() if job.created_at else None,
-        "progress": {
-            "total": total,
-            "completed": completed,
-            "percent": round((completed / total) * 100) if total > 0 else 0,
-        },
-        "results": results,
-    }
+        raise HTTPException(404, "Scan not found. It may have been deleted.")
+    tasks = db.query(KeywordTask).filter_by(job_id=job_id).order_by(KeywordTask.id).all()
+    return serialize_job(job, tasks)
 
 
-# ── Delete Job & Clean Artifacts ──────────────────────────────────────────────
+def export_directory():
+    return os.getenv("EXPORT_DIR", os.path.join(os.getcwd(), "exports", "files"))
 
-@router.delete("/{job_id}", summary="Delete job and associated reports")
+
+@router.delete("/{job_id}")
 def delete_job(job_id: str, db: Session = Depends(get_db)):
-    """Deletes job, all related keyword tasks, and removes generated export files."""
-    job = db.query(Job).filter(Job.id == job_id).first()
+    job = db.get(Job, job_id)
     if not job:
-        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
-
-    # Delete generated export files
-    export_dir = os.path.join(os.getcwd(), "exports", "files")
-    pattern = os.path.join(export_dir, f"results_{job_id}.*")
-    for file_path in glob.glob(pattern):
-        try:
-            os.remove(file_path)
-            logger.info("Removed export file: %s", file_path)
-        except Exception as e:
-            logger.warning("Could not remove export file %s: %s", file_path, e)
-
-    # SQLAlchemy cascade will delete all associated KeywordTask rows
+        raise HTTPException(404, "Scan not found.")
+    if job.status not in TERMINAL:
+        raise HTTPException(409, "This scan is still running. Wait for it to finish before deleting it.")
     db.delete(job)
     db.commit()
-    logger.info("Successfully deleted job %s", job_id)
+    for path in glob.glob(os.path.join(export_directory(), f"results_{job_id}.*")):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return dict(deleted=True, job_id=job_id)
 
-    return {"deleted": True, "job_id": job_id}
 
-
-# ── Download Results ──────────────────────────────────────────────────────────
-
-@router.get("/{job_id}/download/{format}", summary="Download results as CSV or Excel")
+@router.get("/{job_id}/download/{format}")
 def download_results(job_id: str, format: str, db: Session = Depends(get_db)):
-    if format not in ("csv", "xlsx"):
-        raise HTTPException(status_code=400, detail="format must be 'csv' or 'xlsx'.")
-
-    job = db.query(Job).filter(Job.id == job_id).first()
+    if format not in {"csv", "xlsx"}:
+        raise HTTPException(400, "Choose csv or xlsx.")
+    job = db.get(Job, job_id)
     if not job:
-        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
-
-    tasks = db.query(KeywordTask).filter(KeywordTask.job_id == job_id).all()
+        raise HTTPException(404, "Scan not found.")
+    tasks = db.query(KeywordTask).filter_by(job_id=job_id).order_by(KeywordTask.id).all()
     if not tasks:
-        raise HTTPException(status_code=404, detail="No results found for this job.")
-
-    export_dir = os.path.join(os.getcwd(), "exports", "files")
-    os.makedirs(export_dir, exist_ok=True)
-
-    filepath = os.path.join(export_dir, f"results_{job_id}.{format}")
-
-    if format == "csv":
-        generate_csv(job, tasks, filepath)
-        return FileResponse(
-            path=filepath,
-            filename=f"nexusrank_{job.domain}_{job.created_at.strftime('%Y%m%d')}.csv",
-            media_type="text/csv",
-        )
-    else:
-        generate_excel(job, tasks, filepath)
-        return FileResponse(
-            path=filepath,
-            filename=f"nexusrank_{job.domain}_{job.created_at.strftime('%Y%m%d')}.xlsx",
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+        raise HTTPException(404, "No keyword results available.")
+    os.makedirs(export_directory(), exist_ok=True)
+    path = os.path.join(export_directory(), f"results_{job_id}.{format}")
+    (generate_csv if format == "csv" else generate_excel)(job, tasks, path)
+    return FileResponse(path, filename=f"nexusrank_{job.domain}_{job.created_at:%Y%m%d}.{format}",
+                        media_type="text/csv" if format == "csv" else
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

@@ -32,6 +32,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   const oppCount = results.filter((r) => r.rank && r.rank >= 11 && r.rank <= 30).length;
 
   const navItems = [
+    { id: 'rankings' as ViewType, label: 'Rankings', icon: TrendingUp, badge: null },
     {
       id: 'new-scan' as ViewType,
       label: 'New Rank Scan',
@@ -94,11 +95,8 @@ export const AppShell: React.FC<AppShellProps> = ({
             <Sparkles className="w-3 h-3 text-blue-600 dark:text-blue-400" />
             <span className="text-zinc-500 dark:text-zinc-400">Engine:</span>
             <span className="font-medium text-zinc-700 dark:text-zinc-200">
-              {activeProvider === 'free'
-                ? 'Free Live (DuckDuckGo)'
-                : activeProvider === 'mock'
-                ? 'Smart Simulation'
-                : 'SerpApi'}
+              {{ free: 'Free search', mock: 'Simulation', serpapi: 'SerpApi', duckduckgo: 'DuckDuckGo',
+                searxng: 'SearXNG', mixed: 'Mixed sources', unknown: 'Not yet verified' }[activeProvider] || activeProvider}
             </span>
           </div>
 

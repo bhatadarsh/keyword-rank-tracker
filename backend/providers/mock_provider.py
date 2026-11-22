@@ -72,6 +72,7 @@ class MockProvider(SerpProvider):
                 results=[],
                 error="Simulated upstream SERP gateway timeout",
                 status="api_error",
+                actual_provider="mock",
             )
 
         num_results = min(depth, rng.randint(45, max(50, depth)))
@@ -157,4 +158,6 @@ class MockProvider(SerpProvider):
             len(results), keyword, clean_target, primary_rank, secondary_rank,
         )
 
-        return SearchResponse(keyword=keyword, results=results, status="success")
+        return SearchResponse(keyword=keyword, results=results, status="success",
+                              actual_provider="mock", coverage_complete=True,
+                              effective_country=country, effective_language=language, effective_device=device)

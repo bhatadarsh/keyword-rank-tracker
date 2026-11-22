@@ -1,86 +1,75 @@
-import os
 import logging
+import os
+
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 logger = logging.getLogger(__name__)
-
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./rank_tracker.db")
-
 engine = create_engine(
     DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 )
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
 
 def get_db():
-    db = SessionLocal()
-    try:
+    with SessionLocal() as db:
         yield db
-    finally:
-        db.close()
 
 
 def ensure_schema_columns():
-    """
-    Auto-migration helper: dynamically adds any missing columns to existing SQLite/Postgres tables.
-    Guarantees existing databases seamlessly upgrade without manual deletion or ALTER scripts.
-    """
+    """Additive migration. Legacy provenance remains unknown, never assumed live."""
+    provenance = [
+        ("actual_provider", "VARCHAR DEFAULT 'unknown'"),
+        ("fallback_used", "BOOLEAN"), ("fallback_reason", "TEXT"), ("error_message", "TEXT"),
+    ]
+    migrations = {
+        "jobs": [
+            ("provider", "VARCHAR DEFAULT 'mock'"),
+            ("visibility_score", "FLOAT"), ("top_competitors_summary", "TEXT"),
+            ("allow_fallback", "BOOLEAN DEFAULT FALSE NOT NULL"),
+            ("metrics_sample_size", "INTEGER DEFAULT 0"), *provenance,
+        ],
+        "keyword_tasks": [
+            ("page_title", "VARCHAR"), ("previous_rank", "INTEGER"),
+            ("rank_delta", "INTEGER"), ("matching_urls_count", "INTEGER DEFAULT 0"),
+            ("secondary_ranking_url", "VARCHAR"), ("secondary_rank", "INTEGER"),
+            ("top_competitors_json", "TEXT"), ("page_1_competitors_json", "TEXT"),
+            ("observed_at", "TIMESTAMP"), ("results_examined", "INTEGER DEFAULT 0"),
+            ("coverage_complete", "BOOLEAN"), ("effective_country", "VARCHAR"),
+            ("effective_language", "VARCHAR"), ("effective_device", "VARCHAR"),
+            ("previous_status", "VARCHAR"), ("comparison_status", "VARCHAR DEFAULT 'unavailable'"),
+            *provenance,
+        ],
+    }
     try:
         inspector = inspect(engine)
-        existing_tables = inspector.get_table_names()
-
-        if "jobs" in existing_tables:
-            existing_cols = {col["name"] for col in inspector.get_columns("jobs")}
-            job_columns = [
-                ("provider", "VARCHAR DEFAULT 'mock'"),
-                ("visibility_score", "FLOAT"),
-                ("top_competitors_summary", "TEXT"),
-            ]
+        for table, columns in migrations.items():
+            if not inspector.has_table(table):
+                continue
+            existing = {column["name"] for column in inspector.get_columns(table)}
             with engine.begin() as conn:
-                for col_name, col_type in job_columns:
-                    if col_name not in existing_cols:
-                        logger.info("Auto-migrating: Adding column 'jobs.%s'...", col_name)
-                        conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {col_name} {col_type}"))
-
-        if "keyword_tasks" in existing_tables:
-            existing_cols = {col["name"] for col in inspector.get_columns("keyword_tasks")}
-            task_columns = [
-                ("page_title", "VARCHAR"),
-                ("previous_rank", "INTEGER"),
-                ("rank_delta", "INTEGER"),
-                ("matching_urls_count", "INTEGER DEFAULT 0"),
-                ("secondary_ranking_url", "VARCHAR"),
-                ("secondary_rank", "INTEGER"),
-                ("top_competitors_json", "TEXT"),
-            ]
-            with engine.begin() as conn:
-                for col_name, col_type in task_columns:
-                    if col_name not in existing_cols:
-                        logger.info("Auto-migrating: Adding column 'keyword_tasks.%s'...", col_name)
-                        conn.execute(text(f"ALTER TABLE keyword_tasks ADD COLUMN {col_name} {col_type}"))
-
-    except Exception as exc:
-        logger.warning("ensure_schema_columns warning: %s", exc)
+                for name, sql_type in columns:
+                    if name not in existing:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
+    except Exception:
+        logger.exception("Database migration failed; startup aborted. Back up the database before repair.")
+        raise
 
 
 def reconcile_orphan_jobs():
-    """
-    Crash recovery: Reconciles any jobs stuck in 'queued' or 'processing' from an unexpected
-    server shutdown, marking them failed instead of permanently hanging in the UI.
-    """
-    try:
-        with engine.begin() as conn:
-            res = conn.execute(
-                text("UPDATE jobs SET status = 'failed' WHERE status IN ('queued', 'processing')")
-            )
-            if res.rowcount > 0:
-                logger.warning("Startup reconciliation: marked %d stale jobs as 'failed'", res.rowcount)
-                conn.execute(
-                    text("UPDATE keyword_tasks SET status = 'api_error' WHERE status = 'pending'")
-                )
-    except Exception as exc:
-        logger.warning("reconcile_orphan_jobs warning: %s", exc)
+    """Single-instance startup: settle work interrupted by the previous process."""
+    with engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE keyword_tasks SET status = 'api_error', "
+            "error_message = 'Scan interrupted by server restart.' "
+            "WHERE status = 'pending' AND job_id IN "
+            "(SELECT id FROM jobs WHERE status IN ('queued', 'processing'))"
+        ))
+        res = conn.execute(text(
+            "UPDATE jobs SET status = 'failed', error_message = 'Scan interrupted by server restart.' "
+            "WHERE status IN ('queued', 'processing')"
+        ))
+        if res.rowcount:
+            logger.warning("Recovered %d interrupted scans. Run one application instance only.", res.rowcount)

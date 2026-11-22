@@ -3,6 +3,7 @@
 
 /* Tailwind v4 */
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* ── Global Base Styles & Design Tokens ─────────────────────────── */
 @layer base {
